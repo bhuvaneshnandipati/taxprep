@@ -1,0 +1,64 @@
+year: 2025
+standard_deduction: { single: 15750, mfj: 31500, mfs: 15750, hoh: 23625, qss: 31500 }
+additional_std_deduction_65_blind: { single: 2000, mfj: 1600, mfs: 1600, hoh: 2000, qss: 1600 }
+
+brackets:
+  single: [[0, 0.10], [11925, 0.12], [48475, 0.22], [103350, 0.24], [197300, 0.32], [250525, 0.35], [626350, 0.37]]
+  mfj:    [[0, 0.10], [23850, 0.12], [96950, 0.22], [206700, 0.24], [394600, 0.32], [501050, 0.35], [751600, 0.37]]
+  mfs:    [[0, 0.10], [11925, 0.12], [48475, 0.22], [103350, 0.24], [197300, 0.32], [250525, 0.35], [375800, 0.37]]
+  hoh:    [[0, 0.10], [17000, 0.12], [64850, 0.22], [103350, 0.24], [197300, 0.32], [250500, 0.35], [626350, 0.37]]
+  qss:    [[0, 0.10], [23850, 0.12], [96950, 0.22], [206700, 0.24], [394600, 0.32], [501050, 0.35], [751600, 0.37]]
+
+ltcg_brackets:
+  single: [[0, 0.0], [48350, 0.15], [533400, 0.20]]
+  mfj:    [[0, 0.0], [96700, 0.15], [600050, 0.20]]
+  mfs:    [[0, 0.0], [48350, 0.15], [300000, 0.20]]
+  hoh:    [[0, 0.0], [64750, 0.15], [566700, 0.20]]
+  qss:    [[0, 0.0], [96700, 0.15], [600050, 0.20]]
+
+child_tax_credit:
+  per_child: 2200
+  refundable_max_per_child: 1700
+  other_dependent_credit: 500
+  phaseout_agi: { single: 200000, mfj: 400000, mfs: 200000, hoh: 200000, qss: 400000 }
+  phaseout_rate_per_1000: 50
+  earned_income_floor: 2500
+  refundable_rate: 0.15
+
+student_loan_interest:
+  cap: 2500
+  magi_phaseout: { single: [85000, 100000], hoh: [85000, 100000], qss: [85000, 100000], mfj: [170000, 200000], mfs: null }
+
+education_credits:
+  aotc: { max_expense_100pct: 2000, rate_2nd_tier: 0.25, max_expense_2nd_tier: 2000, refundable_share: 0.40 }
+  llc:  { rate: 0.20, expense_cap: 10000 }
+  magi_phaseout: { single: [80000, 90000], hoh: [80000, 90000], qss: [80000, 90000], mfj: [160000, 180000], mfs: null }
+
+eitc:
+  # [phase_in_rate, earned_income_amount, max_credit, phaseout_rate, phaseout_start_single, phaseout_start_mfj]
+  by_children:
+    0: [0.0765, 8490, 649, 0.0765, 10620, 17730]
+    1: [0.34, 12730, 4328, 0.1598, 23350, 30470]
+    2: [0.40, 17880, 7152, 0.2106, 23350, 30470]
+    3: [0.45, 17880, 8046, 0.2106, 23350, 30470]
+  investment_income_limit: 11950
+
+self_employment:
+  net_earnings_factor: 0.9235
+  ss_rate: 0.124
+  medicare_rate: 0.029
+  ss_wage_base: 176100
+
+additional_medicare:
+  rate: 0.009
+  threshold: { single: 200000, mfj: 250000, mfs: 125000, hoh: 200000, qss: 250000 }
+
+niit:
+  rate: 0.038
+  magi_threshold: { single: 200000, mfj: 250000, mfs: 125000, hoh: 200000, qss: 250000 }
+
+nra:
+  standard_deduction_allowed: false
+  filing_statuses: [single, mfs, qss]
+  # FDAP default flat rate on non-effectively-connected US-source investment income
+  fdap_default_rate: 0.30

@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: taxprep-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        sync: false          # paste your Neon connection string, OR your local Postgres via ngrok (see LOCAL-DB.md)
+      - key: JWT_SECRET
+        generateValue: true  # Render auto-generates a random secret
+      - key: ADMIN_EMAILS
+        sync: false          # optional: comma-separated emails to auto-promote to admin
+      - key: CORS_ORIGINS
+        sync: false          # set to your Vercel URL once you have it, e.g. https://taxprep.vercel.app
+      - key: DB_SSLMODE
+        value: require       # change to "disable" in the dashboard if using a self-hosted/local Postgres

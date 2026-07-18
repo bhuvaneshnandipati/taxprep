@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16
+    environment: { POSTGRES_USER: taxprep, POSTGRES_PASSWORD: taxprep, POSTGRES_DB: taxprep }
+    volumes: [pgdata:/var/lib/postgresql/data]
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://taxprep:taxprep@db:5432/taxprep
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      ADMIN_EMAILS: "nandipatibhuvan@gmail.com"
+      DB_SSLMODE: disable
+    ports: ["8000:8000"]
+    depends_on: [db]
+  web:
+    build: ./frontend
+    environment: { NEXT_PUBLIC_API_URL: "http://localhost:8000" }
+    ports: ["3000:3000"]
+    depends_on: [api]
+volumes: { pgdata: {} }

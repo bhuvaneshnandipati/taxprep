@@ -1,0 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;600;700&family=IBM+Plex+Mono:wght@400;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { @apply bg-paper text-ink font-sans; }
+
+.inp { @apply w-full px-3 py-2.5 border-[1.5px] border-rule rounded-md text-[15px] bg-white outline-none focus:border-formblue; }
+.lbl { @apply block text-xs font-semibold uppercase tracking-wider text-formblue mb-1.5; }
+.btn { @apply px-6 py-3 bg-formblue text-white rounded-md text-[15px] font-semibold cursor-pointer disabled:opacity-50; }
+.btn-ghost { @apply px-6 py-3 bg-transparent text-formblue border-[1.5px] border-formblue rounded-md text-[15px] font-semibold cursor-pointer; }
+.card { @apply bg-white border-[1.5px] border-rule rounded-lg p-5; }
+.chip { @apply px-4 py-2.5 rounded-md border-[1.5px] text-sm cursor-pointer; }
+.chip-on { @apply border-formblue bg-bluesoft text-formblue font-semibold; }
+.chip-off { @apply border-rule bg-white text-ink; }

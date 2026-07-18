@@ -1,0 +1,80 @@
+year: 2025
+# Treaty benefit rules keyed by country. article/benefit codes drive engine logic.
+treaties:
+  India:
+    - { article: "21(2)", benefit: standard_deduction, applies_to: [student], form_8833_required: false,
+        note: "Students/business apprentices may claim the U.S. standard deduction on Form 1040-NR." }
+  China:
+    - { article: "20(c)", benefit: wage_exemption, amount: 5000, applies_to: [student], form_8833_required: false,
+        note: "Up to $5,000 of personal-service income exempt for students; survives residency change per protocol." }
+    - { article: "20(b)", benefit: scholarship_exemption, amount: null, applies_to: [student], form_8833_required: false,
+        note: "Scholarship/fellowship grants exempt." }
+  South Korea:
+    - { article: "21(1)", benefit: wage_exemption, amount: 2000, applies_to: [student], form_8833_required: false,
+        note: "Up to $2,000 of personal-service income exempt for students." }
+  Canada:
+    - { article: "XV", benefit: wage_exemption_threshold, amount: 10000, applies_to: [employee], form_8833_required: true,
+        note: "Employment income exempt if total is $10,000 or less." }
+  Germany:
+    - { article: "20(4)", benefit: wage_exemption, amount: 9000, applies_to: [student], form_8833_required: false,
+        note: "Up to $9,000 of dependent personal services income exempt for students." }
+  Philippines:
+    - { article: "22(1)", benefit: wage_exemption, amount: 3000, applies_to: [student], form_8833_required: false,
+        note: "Up to $3,000 personal services income exempt for students." }
+  Bangladesh:
+    - { article: "21(2)", benefit: wage_exemption, amount: 8000, applies_to: [student], form_8833_required: false,
+        note: "Up to $8,000 of personal services income exempt for students." }
+  Belgium:
+    - { article: "19(1)(b)", benefit: wage_exemption, amount: 9000, applies_to: [student], form_8833_required: false,
+        note: "Up to $9,000 of personal services income exempt for students." }
+  Bulgaria:
+    - { article: "19(1)(b)", benefit: wage_exemption, amount: 9000, applies_to: [student], form_8833_required: false,
+        note: "Up to $9,000 of personal services income exempt for students." }
+  Egypt:
+    - { article: "23(1)", benefit: wage_exemption, amount: 3000, applies_to: [student], form_8833_required: false,
+        note: "Up to $3,000 of personal services income exempt for students." }
+  France:
+    - { article: "21(1)", benefit: scholarship_exemption, amount: null, applies_to: [student], form_8833_required: false,
+        note: "Scholarship/fellowship grants exempt for students." }
+  Indonesia:
+    - { article: "19(1)", benefit: wage_exemption, amount: 2000, applies_to: [student], form_8833_required: false,
+        note: "Up to $2,000 of personal services income exempt for students." }
+  Israel:
+    - { article: "24(1)", benefit: wage_exemption, amount: 3000, applies_to: [student], form_8833_required: false,
+        note: "Up to $3,000 of personal services income exempt for students." }
+  Morocco:
+    - { article: "18", benefit: wage_exemption, amount: 2000, applies_to: [student], form_8833_required: false,
+        note: "Up to $2,000 of personal services income exempt for students." }
+  Netherlands:
+    - { article: "22(1)", benefit: wage_exemption, amount: 2000, applies_to: [student], form_8833_required: false,
+        note: "Up to $2,000 of personal services income exempt for students." }
+  Norway:
+    - { article: "16(1)", benefit: wage_exemption, amount: 2000, applies_to: [student], form_8833_required: false,
+        note: "Up to $2,000 of personal services income exempt for students." }
+  Pakistan:
+    - { article: "XIII(1)", benefit: wage_exemption, amount: 5000, applies_to: [student], form_8833_required: false,
+        note: "Up to $5,000 of personal services income exempt for students." }
+  Poland:
+    - { article: "18(1)", benefit: wage_exemption, amount: 2000, applies_to: [student], form_8833_required: false,
+        note: "Up to $2,000 of personal services income exempt for students." }
+  Portugal:
+    - { article: "23(1)", benefit: wage_exemption, amount: 5000, applies_to: [student], form_8833_required: false,
+        note: "Up to $5,000 of personal services income exempt for students." }
+  Romania:
+    - { article: "20(1)", benefit: wage_exemption, amount: 2000, applies_to: [student], form_8833_required: false,
+        note: "Up to $2,000 of personal services income exempt for students." }
+  Slovenia:
+    - { article: "20(1)", benefit: wage_exemption, amount: 5000, applies_to: [student], form_8833_required: false,
+        note: "Up to $5,000 of personal services income exempt for students." }
+  Spain:
+    - { article: "22(1)", benefit: wage_exemption, amount: 5000, applies_to: [student], form_8833_required: false,
+        note: "Up to $5,000 of personal services income exempt for students." }
+  Thailand:
+    - { article: "22(1)", benefit: wage_exemption, amount: 3000, applies_to: [student], form_8833_required: false,
+        note: "Up to $3,000 of personal services income exempt for students." }
+  Tunisia:
+    - { article: "20", benefit: wage_exemption, amount: 4000, applies_to: [student], form_8833_required: false,
+        note: "Up to $4,000 of personal services income exempt for students." }
+  Venezuela:
+    - { article: "21(1)", benefit: wage_exemption, amount: 5000, applies_to: [student], form_8833_required: false,
+        note: "Up to $5,000 of personal services income exempt for students." }

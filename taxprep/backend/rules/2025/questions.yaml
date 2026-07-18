@@ -1,0 +1,38 @@
+year: 2025
+# Adaptive interview graph. Each node: id, section, text, type, options?, show_if? (python-safe expr on answers), maps_to
+questions:
+  - { id: citizen, section: residency, text: "Are you a U.S. citizen?", type: yesno, maps_to: profile.citizen }
+  - { id: green_card, section: residency, text: "Do you have a green card (lawful permanent resident)?", type: yesno,
+      show_if: "answers.get('citizen') == 'no'", maps_to: profile.green_card }
+  - { id: visa, section: residency, text: "What was your visa/status during the tax year?", type: select,
+      options: [F-1, J-1 Student, J-1 Non-student, M-1, H-1B, H-2A, H-2B, L-1, O-1, TN, E-1, E-2, E-3, OPT, STEM OPT, CPT, B1/B2, K, Asylum, Refugee, Other],
+      show_if: "answers.get('green_card') == 'no'", maps_to: profile.visa }
+  - { id: country, section: residency, text: "Country of citizenship?", type: text,
+      show_if: "answers.get('green_card') == 'no'", maps_to: profile.country }
+  - { id: first_entry_year, section: residency, text: "Year you first entered the U.S. in this status?", type: number,
+      show_if: "answers.get('green_card') == 'no'", maps_to: profile.first_entry_year }
+  - { id: days_y0, section: residency, text: "Days present in the U.S. during the tax year?", type: number,
+      show_if: "answers.get('green_card') == 'no'", maps_to: profile.days_current }
+  - { id: days_y1, section: residency, text: "Days present in the prior year?", type: number,
+      show_if: "answers.get('green_card') == 'no'", maps_to: profile.days_prior1 }
+  - { id: days_y2, section: residency, text: "Days present two years prior?", type: number,
+      show_if: "answers.get('green_card') == 'no'", maps_to: profile.days_prior2 }
+  - { id: multi_employer, section: employment, text: "Did you have more than one employer?", type: yesno }
+  - { id: remote_states, section: employment, text: "Did you work in more than one state?", type: yesno }
+  - { id: has_interest, section: income, text: "Did you earn bank or brokerage interest (1099-INT)?", type: yesno }
+  - { id: has_dividends, section: income, text: "Did you receive dividends (1099-DIV)?", type: yesno,
+      show_if: "answers.get('_residency') != 'nonresident'" }
+  - { id: has_capital_gains, section: income, text: "Did you sell stocks, crypto, or other investments?", type: yesno }
+  - { id: has_self_employment, section: income, text: "Did you have self-employment or gig income (1099-NEC)?", type: yesno,
+      show_if: "answers.get('_residency') != 'nonresident'" }
+  - { id: is_student, section: education, text: "Were you enrolled at a college or university?", type: yesno }
+  - { id: tuition_paid, section: education, text: "Did you pay tuition or receive Form 1098-T?", type: yesno,
+      show_if: "answers.get('is_student') == 'yes'" }
+  - { id: student_loan, section: deductions, text: "Did you pay student loan interest (1098-E)?", type: yesno }
+  - { id: has_dependents, section: dependents, text: "Do you have dependents?", type: yesno,
+      show_if: "answers.get('_residency') != 'nonresident'" }
+  - { id: num_children, section: dependents, text: "How many qualifying children under 17?", type: number,
+      show_if: "answers.get('has_dependents') == 'yes'" }
+  - { id: ca_residency, section: state, text: "Were you a California resident for the entire year?", type: yesno }
+  - { id: ca_income_pct, section: state, text: "Approximately what percent of your income was earned in California?", type: number,
+      show_if: "answers.get('ca_residency') == 'no'" }
