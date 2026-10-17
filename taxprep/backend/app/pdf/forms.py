@@ -1,4 +1,4 @@
-"""Filing package = instruction/cover sheet (generated) + the OFFICIAL agency forms, filled in.
+"""Synthetic preview package = cover sheet (generated) + the official agency forms, filled in.
 
 Order follows the IRS attachment-sequence numbers: Form 1040/1040-NR, Schedule 1 (seq. 01),
 Schedule NEC (7B), Schedule OI (7C); Form 8843 is placed after the federal return; the state
@@ -22,7 +22,7 @@ class _Pager(FormPage):
         c = self.c
         c.setLineWidth(0.8); c.line(36, 34, 576, 34)
         c.setFont("Helvetica", 6.5)
-        c.drawString(36, 25, f"TaxPrep filing instructions - page {page} (not a tax form; do not mail)")
+        c.drawString(36, 25, f"TaxPrep synthetic preview - page {page} (not a tax form; do not file)")
 
     """FormPage that starts a new page instead of running off the bottom."""
     def __init__(self, c, year):
@@ -60,10 +60,10 @@ def _wrap(s, n=118):
 def _cover(taxpayer, result, year, included, missing) -> bytes:
     buf = io.BytesIO()
     c = _canvas.Canvas(buf, pagesize=letter)
-    c.setTitle(f"Tax Return Filing Package — TY{year}")
+    c.setTitle(f"Synthetic Tax Return Preview — TY{year}")
     p = _Pager(c, year)
     fed, st = result["federal"], result["state"]
-    p.header("PKG", "Filing Instructions & Summary", year, "Prepared with TaxPrep — keep this page, do not mail it",
+    p.header("PKG", "Synthetic Preview & Summary", year, "Prepared with TaxPrep — do not sign or file",
              sub=f"Prepared for {taxpayer.get('first_name', '')} {taxpayer.get('last_name', '')}")
     p.section("SYNTHETIC TEST PREVIEW - DO NOT FILE")
     p.text("Tax coverage and correctness review are incomplete. This package is not ready for filing.", size=8)
@@ -85,7 +85,7 @@ def _cover(taxpayer, result, year, included, missing) -> bytes:
 
     warnings = (fed.get("warnings") or []) + (st.get("warnings") or [])
     if warnings or missing:
-        p.section("Review before filing")
+        p.section("Items requiring review")
         for w in warnings:
             for i, chunk in enumerate(_wrap("! " + w, 116)):
                 p.text(chunk if i == 0 else "   " + chunk, size=7.5, gap=9.5)
@@ -98,25 +98,15 @@ def _cover(taxpayer, result, year, included, missing) -> bytes:
         for i, chunk in enumerate(_wrap("• " + e)):
             p.text(chunk if i == 0 else "   " + chunk, size=7.5, gap=9.5)
 
-    p.section("What is in this package (official forms, filled in)")
+    p.section("Draft forms included for synthetic testing")
     for f in included:
         p.text("• " + f, size=8)
 
-    p.section("Filing checklist")
-    for item in result["checklist"]:
-        p.need(16)
-        p.checks("", [(item, False)])
-
-    p.section("Where and when to mail")
-    mail = result.get("mailing") or {}
-    if mail.get("federal"):
-        p.text(f"Federal: {mail['federal']}", size=8)
-    if mail.get("state"):
-        p.text(f"{st['state']}: {mail['state']}", size=8)
-    p.text("Federal due date: April 15, 2026 (June 15, 2026 for nonresident aliens who had no wages subject to "
-           "U.S. withholding). Form 8843 filed alone: June 15, 2026.", size=7.5)
-    p.text("Sign and date each return. Attach W-2 Copy B (and Forms 1042-S) to the federal return and W-2 Copy 2 "
-           "to the state return. Keep copies of everything.", size=7.5)
+    p.section("Before any real-world use")
+    for line in _wrap("A qualified reviewer must verify tax rules, eligibility, missing forms, calculations, and "
+                      "current agency instructions. The standard 2025 filing deadlines have passed; late or extended "
+                      "filing circumstances require separate review."):
+        p.text(line, size=7.5, gap=9.5)
     p.footer("instructions", p.page)
     c.showPage()
     c.save()

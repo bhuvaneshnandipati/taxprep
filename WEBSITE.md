@@ -26,3 +26,5 @@ The public browser journey also passed synthetic registration, return creation a
 Scanned-image OCR is unverified on Vercel. Manual entry remains available. Provider request-size limits may be smaller than the app's upload limit. E-filing is unsupported. Authentication needs abuse controls, account recovery/verification, and a security/privacy review. Federal, treaty, dual-status, and state calculations and forms require independent review for current law and individual applicability before any real taxpayer data is used.
 
 Only synthetic data may be entered or uploaded. The UI and PDFs label this preview accordingly.
+
+The detailed 2025 release blockers, year-specific code map, official-source links and 2026 conversion steps are in [TAX_YEAR_HANDOFF.md](TAX_YEAR_HANDOFF.md).

@@ -43,6 +43,10 @@ INDIA = ({"visa": "F-1", "country": "India", "first_entry_year": 2023, "days_cur
 
 def test_india_nra_package_uses_official_forms():
     res, doc = _pkg(*INDIA)
+    cover = doc[0].get_text()
+    assert "SYNTHETIC TEST PREVIEW - DO NOT FILE" in cover
+    assert "Where and when to mail" not in cover
+    assert "Sign and date each return" not in cover
     titles = [p.get_text()[:120] for p in doc]
     assert any("1040-NR" in t and "Nonresident Alien Income Tax Return" in t for t in titles)
     assert any("SCHEDULE OI" in t for t in titles)

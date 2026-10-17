@@ -1,5 +1,13 @@
 # TaxPrep continuation log
 
+For the current 2025 status and 2026 conversion plan, see [TAX_YEAR_HANDOFF.md](TAX_YEAR_HANDOFF.md). This log retains the history of earlier work and blockers; superseded entries below are not the current release state.
+
+## October 17, 2026: 2025 handoff and PDF safety pass
+
+- Added a file-by-file 2026 conversion guide with current hosting, test evidence, official sources, year-specific code locations, and real-data release blockers.
+- Changed the PDF cover from filing instructions to a synthetic preview summary; removed mailing, deadline and signing directions from its cover. The official form pages remain watermarked synthetic-only. A rendered example showed the cover content legibly after wrapping the final note.
+- Added a PDF regression assertion for the synthetic-only cover. Backend suite: 95 passed, 2 skipped. This does not establish tax correctness or production readiness.
+
 Updated October 16, 2026 (America/Los_Angeles).
 
 ## Recovered
