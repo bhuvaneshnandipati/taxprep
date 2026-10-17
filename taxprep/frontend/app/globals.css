@@ -4,6 +4,11 @@
 @tailwind utilities;
 
 body { @apply bg-paper text-ink font-sans; }
+/* Avoid iOS input zoom while preserving desktop field sizing. */
+@media (max-width: 640px) {
+  input, select, textarea { font-size: 16px !important; }
+  button, a.btn, a.btn-ghost { min-height: 44px; }
+}
 
 .inp { @apply w-full px-3 py-2.5 border-[1.5px] border-rule rounded-md text-[15px] bg-white outline-none focus:border-formblue; }
 .lbl { @apply block text-xs font-semibold uppercase tracking-wider text-formblue mb-1.5; }

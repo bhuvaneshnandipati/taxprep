@@ -26,9 +26,9 @@ export default function Dashboard() {
 
   return (
     <main className="max-w-3xl mx-auto px-5 py-10">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <h1 className="text-2xl font-bold">Your returns</h1>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button className="btn" onClick={create}>Start 2025 return</button>
           <button className="btn-ghost" onClick={() => { clearToken(); r.push("/"); }}>Sign out</button>
         </div>
@@ -42,8 +42,8 @@ export default function Dashboard() {
       ) : (
         <div className="space-y-3">
           {returns.map((x) => (
-            <div key={x.id} className="card flex items-center justify-between hover:border-formblue">
-              <a href={`/return/${x.id}`} className="flex-1">
+            <div key={x.id} className="card flex flex-wrap gap-3 items-center justify-between hover:border-formblue">
+              <a href={`/return/${x.id}`} className="flex-1 min-w-[160px] break-words">
                 <div className="font-semibold">Tax year {x.tax_year}{x.name ? ` · ${x.name}` : ""}</div>
                 <div className="text-xs text-gray-500 font-mono">Updated {x.updated_at?.slice(0, 16)}</div>
               </a>

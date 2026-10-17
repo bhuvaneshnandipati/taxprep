@@ -3,19 +3,29 @@
 Tax year 2025 federal and CA/NY return preparation for international students and visa holders.
 Application source is in `taxprep/`.
 
+## Use as a hosted website
+
+Visitors can use TaxPrep in a mobile or desktop browser without installing any
+software. Follow [website publishing setup](WEBSITE.md) to connect GitHub,
+Vercel, Render (native Python), and Postgres. No hosting is connected yet.
+
 ## Run locally
 
-Install Docker Desktop, then from the repository root:
+Install Python 3.12 and Node.js 20 or newer (including npm). In PowerShell,
+from the repository root:
 
-```sh
+```powershell
 cd taxprep
-docker compose up --build
+powershell -ExecutionPolicy Bypass -File .\Start-TaxPrep.ps1 -Setup
 ```
 
 Open http://localhost:3000. The API is at http://localhost:8000/docs.
-For personal tax identifiers, set `DATA_KEY` and a random `JWT_SECRET` in
-`taxprep/.env` before starting; see [deployment setup](taxprep/DEPLOY.md).
-Keep the same DATA_KEY between restarts so saved identifiers remain readable.
+On later runs, use the same command without `-Setup`. Keep the terminal open;
+press Ctrl+C to stop the app. The launcher uses SQLite, installs backend packages
+in a virtual environment, and saves reusable encryption/session keys in
+`taxprep/backend/.local-secrets.json` (excluded from Git). Back up that file with
+`taxprep/backend/taxprep.db`; losing the key makes saved identifiers unreadable.
+Tesseract is optional for manual entry and required for image OCR uploads.
 
 ## Use the application
 
