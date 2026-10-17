@@ -29,3 +29,5 @@ Existing Vercel Hobby frontend: https://taxprep-mu.vercel.app. Latest observed d
 Neon OAuth is at GitHub's **Authorize Neon Console**, asking read-only access to email addresses. It was not approved. User confirmation is required for this new access and any subsequent legally binding account terms. Screenshot saved to the chat outputs folder. Existing Vercel account is accessible. No backend or persistent database was created, and no secrets were committed.
 
 Once authorized: create Neon Free project, configure Vercel FastAPI project, set backend-only persistent secrets and exact CORS, connect frontend via NEXT_PUBLIC_API_URL, deploy, and execute hosted synthetic E2E. See WEBSITE.md for settings and release gates. Tax correctness and security reviews remain incomplete, and the app is not production-ready.
+
+Public API calls are disabled by default, and Render endpoints are rejected. After verifying the replacement API, set `NEXT_PUBLIC_ENABLE_API=true` together with its HTTPS `NEXT_PUBLIC_API_URL` and rebuild. Localhost development remains enabled.

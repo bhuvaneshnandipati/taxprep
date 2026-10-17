@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { login, register } from "@/lib/api";
+import { apiAvailable, login, register } from "@/lib/api";
 
 export default function AuthPage() {
   const r = useRouter();
@@ -26,6 +26,7 @@ export default function AuthPage() {
     <main className="max-w-md mx-auto px-5 py-16">
       <h1 className="text-2xl font-bold mb-1">Prepare your 2025 tax return</h1>
       <p className="text-sm text-gray-500 mb-8">Built for international students and visa holders: residency test, Form 8843, 1040-NR with tax treaties, dual-status, plus California and New York returns.</p>
+      <p className="text-sm mb-4">Hosted backend unavailable: account creation and sign-in are disabled until the replacement API is verified.</p>
       <form className="card" onSubmit={(e) => { e.preventDefault(); if (!busy) submit(); }}>
         <div className="flex gap-2 mb-5">
           <button className={`chip ${mode === "login" ? "chip-on" : "chip-off"}`} type="button" onClick={() => setMode("login")}>Sign in</button>
@@ -45,7 +46,7 @@ export default function AuthPage() {
             <input className="inp mt-2" value={adminCode} onChange={(e) => setAdminCode(e.target.value)} placeholder="Only for the site administrator" />
           </details>)}
         {err && <p role="alert" className="text-sm text-owe mb-4">{err}</p>}
-        <button className="btn w-full" type="submit" disabled={busy}>
+        <button className="btn w-full" type="submit" disabled={busy || !apiAvailable()}>
           {busy ? "Working…" : mode === "login" ? "Sign in" : "Create account"}
         </button>
       </form>

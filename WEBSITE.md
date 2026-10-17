@@ -31,3 +31,5 @@ Neon sign-in via GitHub stops at **Authorize Neon Console**, requesting read-onl
 The application is not production-ready. Existing federal, treaty, dual-status, CA/NY calculations and supplemental-form limitations require independent review, including changes in law. Authentication needs abuse controls, account recovery/verification and a broader security/privacy review before handling actual taxpayer data. Local tests do not establish hosted E2E or full tax correctness. PDFs and the UI explicitly identify synthetic test previews. No e-filing is supported.
 
 Free tiers have resource limits; they do not guarantee continuous availability or eliminate maintenance.
+
+Public API calls are disabled by default, and Render endpoints are rejected. After verifying the replacement API, set `NEXT_PUBLIC_ENABLE_API=true` together with its HTTPS `NEXT_PUBLIC_API_URL` and rebuild. Localhost development remains enabled.
