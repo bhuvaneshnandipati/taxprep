@@ -1,9 +1,17 @@
 """OCR pipeline tests using a synthetic W-2 rendered with PIL."""
-import io, os
+import io, os, shutil
+import pytest
 from PIL import Image, ImageDraw, ImageFont
 
-FONT = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 28)
-FONT_B = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 30)
+def _font(linux_path, windows_name, size):
+    path = linux_path if os.path.exists(linux_path) else os.path.join(
+        os.environ.get("WINDIR", "C:/Windows"), "Fonts", windows_name)
+    return ImageFont.truetype(path, size) if os.path.exists(path) else ImageFont.load_default(size=size)
+
+
+FONT = _font("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "arial.ttf", 28)
+FONT_B = _font("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "arialbd.ttf", 30)
+requires_tesseract = pytest.mark.skipif(not shutil.which("tesseract"), reason="Tesseract OCR is not installed")
 from app.ocr.service import parse_document, process_upload, detect_doc_type
 
 
@@ -50,6 +58,7 @@ PLATINUM FINISHING SYSTEMS
     assert f["employer"]["value"].startswith("PLATINUM")
 
 
+@requires_tesseract
 def test_ocr_synthetic_w2_image():
     out = process_upload(make_w2_png(), "w2.png")
     f = out["fields"]
@@ -70,6 +79,7 @@ def test_parse_1099_int():
     assert out["fields"]["interest"]["value"] == 312.45
 
 
+@requires_tesseract
 def test_upload_review_apply_api():
     os.environ["DATABASE_URL"] = "sqlite:///./test_ocr_api.db"
     from fastapi.testclient import TestClient

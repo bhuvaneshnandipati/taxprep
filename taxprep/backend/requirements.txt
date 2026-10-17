@@ -10,3 +10,5 @@ reportlab
 psycopg2-binary
 pytesseract
 pillow
+pillow-heif
+pymupdf>=1.24

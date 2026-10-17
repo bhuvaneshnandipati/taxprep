@@ -31,9 +31,10 @@ export default function AdminPage() {
   };
   const savePack = async () => {
     try {
+      JSON.parse(packBody);
       await apiJson(`/admin/rules/${packSel!.year}/${packSel!.pack}`,
         { method: "PUT", body: packBody });
-      setErr(""); alert("Rule pack saved. Previous version backed up as .bak.");
+      setErr(""); alert("Rule pack saved (previous version backed up as .bak). Note: on Render's free tier the disk is reset on every deploy — also commit this change to rules/ in GitHub.");
     } catch (e: any) { setErr(e.message); }
   };
   const purgeAudit = async () => {

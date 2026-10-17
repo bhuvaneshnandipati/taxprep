@@ -1,243 +1,55 @@
-"""Form renderers. Each takes taxpayer info + computed lines and draws
-the form onto a shared canvas, replicating the official layout.
+"""Filing package = instruction/cover sheet (generated) + the OFFICIAL agency forms, filled in.
 
-f1040       -> Form 1040 / 1040-NR (shared line structure, NR variants)
-f8843       -> Form 8843 Part I + Part III
-ca540       -> California Form 540 / 540NR
-build_package -> cover summary + explanations + checklist + all forms, one PDF
+Order follows the IRS attachment-sequence numbers: Form 1040/1040-NR, Schedule 1 (seq. 01),
+Schedule NEC (7B), Schedule OI (7C); Form 8843 is placed after the federal return; the state
+return follows as a separate stapled set.
 """
+from __future__ import annotations
 import io
+import pymupdf
 from reportlab.pdfgen import canvas as _canvas
 from reportlab.lib.pagesizes import letter
-from .base import FormPage, money, W, H, ML, MR
+from .base import FormPage, H
+from . import official
+from .fill import has_template
 
-FS_LABELS = {"single": "Single", "mfj": "Married filing jointly",
-             "mfs": "Married filing separately", "hoh": "Head of household",
-             "qss": "Qualifying surviving spouse"}
-
-
-def f1040(c, taxpayer: dict, fed: dict, year: int):
-    is_nr = fed["form"] == "1040-NR"
-    L = fed["lines"]
-    p = FormPage(c)
-    p.header(fed["form"],
-             "U.S. Nonresident Alien Income Tax Return" if is_nr else "U.S. Individual Income Tax Return",
-             year, "Department of the Treasury—Internal Revenue Service",
-             omb="OMB No. 1545-0074")
-    p.id_block([
-        ("Your first name and middle initial", taxpayer.get("first_name", "")),
-        ("Last name", taxpayer.get("last_name", "")),
-        ("Your social security number / ITIN", taxpayer.get("ssn", "")),
-        ("Home address (number and street)", taxpayer.get("address", "")),
-        ("City, state, ZIP", taxpayer.get("city_state_zip", "")),
-        ("Foreign country (if applicable)", taxpayer.get("country", "") if is_nr else ""),
-    ], cols=3)
-    fs = fed["filing_status"]
-    opts = [("Single", fs == "single"), ("MFS", fs == "mfs"), ("QSS", fs == "qss")] if is_nr else \
-           [("Single", fs == "single"), ("MFJ", fs == "mfj"), ("MFS", fs == "mfs"),
-            ("HOH", fs == "hoh"), ("QSS", fs == "qss")]
-    p.checks("Filing Status:", opts)
-
-    p.section("Income")
-    p.line("1a", "Total amount from Form(s) W-2, box 1", L["1a_wages"])
-    p.line("2b", "Taxable interest", L["2b_interest"])
-    p.line("3b", "Ordinary dividends", L["3b_dividends"])
-    p.line("7", "Capital gain or (loss). Attach Schedule D if required", L["7_capital_gain"])
-    p.line("8", "Additional income from Schedule 1", L["8_other_income"])
-    p.line("9", "Add lines 1a through 8. This is your total income", L["9_total_income"], bold=True)
-    p.line("10", "Adjustments to income from Schedule 1", L["10_adjustments"])
-    p.line("11", "Subtract line 10 from line 9. This is your adjusted gross income", L["11_agi"], bold=True)
-    treaty_std = bool((fed.get("treaty") or {}).get("standard_deduction"))
-    p.line("12", "Itemized deductions (Schedule A, Form 1040-NR)" if (is_nr and not treaty_std)
-           else "Standard deduction or itemized deductions", L["12_deduction"])
-    p.line("15", "Subtract line 12 from line 11. This is your taxable income", L["15_taxable_income"], bold=True)
-
-    p.section("Tax and Credits")
-    p.line("16", "Tax (see instructions)", L["16_tax"])
-    p.line("19", "Child tax credit or credit for other dependents", L["19_ctc_odc"])
-    p.line("20", "Other credits (Schedule 3)", L["20_other_credits"])
-    p.line("22", "Subtract credits from line 16", L["22_after_credits"], bold=True)
-    p.line("23", "Other taxes, including self-employment tax (Schedule 2)", L["23_other_taxes"])
-    p.line("24", "Add lines 22 and 23. This is your total tax", L["24_total_tax"], bold=True)
-
-    p.section("Payments")
-    p.line("25", "Federal income tax withheld from Forms W-2 and 1099", L["25_withholding"])
-    if not is_nr:
-        p.line("27", "Earned income credit (EIC)", L["27_eitc"])
-        p.line("28", "Additional child tax credit", L["28_actc"])
-        p.line("29", "American opportunity credit (Form 8863, line 8)", L["29_aotc_refundable"])
-    p.line("33", "Total payments", L["33_total_payments"], bold=True)
-
-    refund = L["refund"]
-    p.section("Refund / Amount You Owe")
-    if refund >= 0:
-        p.line("34", "Amount you overpaid — this is your refund", refund, bold=True)
-        p.line("37", "Amount you owe", 0)
-    else:
-        p.line("34", "Amount you overpaid", 0)
-        p.line("37", "Amount you owe", abs(refund), bold=True)
-
-    if is_nr and fed.get("treaty") and fed["treaty"].get("articles"):
-        p.section("Schedule OI — Treaty Information (excerpt)")
-        p.text(f"Country: {fed['treaty']['country']}    Treaty article(s): {fed['treaty']['articles']}", size=8)
-        exempt = fed["treaty"]["wage_exempt"] + fed["treaty"]["scholarship_exempt"]
-        if exempt:
-            p.text(f"Exempt income claimed under treaty: ${exempt:,.0f}", size=8)
-
-    p.signature()
-    p.footer(fed["form"], 1, 1)
-    c.showPage()
+FS_LABELS = {"single": "Single", "mfj": "Married filing jointly", "mfs": "Married filing separately",
+             "hoh": "Head of household", "qss": "Qualifying surviving spouse"}
 
 
-def f8843(c, taxpayer: dict, profile: dict, year: int):
-    p = FormPage(c)
-    p.header("8843", "Statement for Exempt Individuals and Individuals With a Medical Condition",
-             year, "Department of the Treasury—Internal Revenue Service",
-             sub="For use by alien individuals only.", omb="OMB No. 1545-0074")
-    p.id_block([
-        ("Your first name and initial", taxpayer.get("first_name", "")),
-        ("Last name", taxpayer.get("last_name", "")),
-        ("U.S. taxpayer identification number, if any", taxpayer.get("ssn", "")),
-    ], cols=3)
+class _Pager(FormPage):
+    def footer(self, form_no, page, total=None):
+        c = self.c
+        c.setLineWidth(0.8); c.line(36, 34, 576, 34)
+        c.setFont("Helvetica", 6.5)
+        c.drawString(36, 25, f"TaxPrep filing instructions - page {page} (not a tax form; do not mail)")
 
-    p.section("Part I — General Information")
-    p.free_field("1a  Type of U.S. visa and date you entered the United States",
-                 f"{profile.get('visa','')} — first entry {profile.get('first_entry_year','')}")
-    p.free_field("1b  Current nonimmigrant status", profile.get("visa", ""))
-    p.free_field("2   Country of citizenship during the tax year", profile.get("country", ""))
-    p.line("4a", f"Days present in the United States during {year}", None,
-           text_value=str(profile.get("days_current", "")))
-    p.line("4a", f"Days present during {year-1}", None, text_value=str(profile.get("days_prior1", "")))
-    p.line("4a", f"Days present during {year-2}", None, text_value=str(profile.get("days_prior2", "")))
-    p.line("4b", f"Days in {year} you claim you can exclude", None,
-           text_value=str(profile.get("days_current", "")))
+    """FormPage that starts a new page instead of running off the bottom."""
+    def __init__(self, c, year):
+        super().__init__(c)
+        self.year, self.page = year, 1
 
-    p.section("Part III — Students")
-    p.free_field("9   Academic institution attended during " + str(year),
-                 taxpayer.get("school", ""))
-    p.checks("12  Were you present in the U.S. as a student for any part of more than 5 calendar years?",
-             [("Yes", False), ("No", True)])
-    p.signature("This form is filed by exempt individuals to exclude days of presence for the Substantial Presence Test.")
-    p.footer("8843", 1, 1)
-    c.showPage()
+    def need(self, h=20):
+        if self.y - h < 50:
+            self.footer("instructions", self.page)
+            self.c.showPage()
+            self.page += 1
+            self.y = H - 50
+
+    def text(self, s, **kw):
+        self.need(12)
+        super().text(s, **kw)
+
+    def section(self, t):
+        self.need(40)
+        super().section(t)
 
 
-STATE_META = {
-    "CA": {"agency": "Franchise Tax Board — State of California",
-           "titles": {"540": "California Resident Income Tax Return",
-                       "540NR": "California Nonresident or Part-Year Resident Income Tax Return"},
-           "labels": {"17": "California adjusted gross income", "18": "CA standard deduction or itemized deductions",
-                       "19": "Taxable income", "31": "Tax", "32": "Exemption credits",
-                       "64": "Total tax", "71": "California income tax withheld"},
-           "refund_line": ("115", "111")},
-    "NY": {"agency": "Department of Taxation and Finance — State of New York",
-           "titles": {"IT-201": "New York Resident Income Tax Return",
-                       "IT-203": "New York Nonresident and Part-Year Resident Income Tax Return"},
-           "labels": {"19": "Federal adjusted gross income", "34": "Standard deduction and dependent exemptions",
-                       "37": "Taxable income", "39": "New York State tax",
-                       "46": "Total New York State taxes", "72": "Total New York State tax withheld"},
-           "refund_line": ("78", "80")},
-}
-
-
-def state_form(c, taxpayer: dict, state: dict, fed: dict, year: int):
-    L = state["lines"]
-    form = state["form"]
-    code = state.get("state", "CA")
-    meta = STATE_META.get(code, STATE_META["CA"])
-    p = FormPage(c)
-    p.header(form, meta["titles"].get(form, f"{code} Income Tax Return"), year, meta["agency"])
-    p.id_block([
-        ("First name", taxpayer.get("first_name", "")),
-        ("Last name", taxpayer.get("last_name", "")),
-        ("SSN or ITIN", taxpayer.get("ssn", "")),
-        ("Address", taxpayer.get("address", "")),
-        ("City, State, ZIP", taxpayer.get("city_state_zip", "")),
-        ("Filing status", FS_LABELS.get(fed["filing_status"], "")),
-    ], cols=3)
-
-    p.section("Taxable Income / Tax / Payments")
-    labels = meta["labels"]
-    for key, val in L.items():
-        if key == "refund":
-            continue
-        num = key.split("_", 1)[0]
-        label = labels.get(num, key.split("_", 1)[1].replace("_", " ").capitalize())
-        p.line(num, label, val, bold=num in ("19", "37", "64", "46"))
-
-    refund = L["refund"]
-    rl_refund, rl_owe = meta["refund_line"]
-    p.section("Refund / Tax Due")
-    if refund >= 0:
-        p.line(rl_refund, "REFUND — amount overpaid", refund, bold=True)
-    else:
-        p.line(rl_owe, "AMOUNT YOU OWE", abs(refund), bold=True)
-
-    p.signature()
-    p.footer(form, 1, 1)
-    c.showPage()
-
-
-def _cover(c, taxpayer, result, year):
-    p = FormPage(c)
-    fed, st, checklist = result["federal"], result["state"], result["checklist"]
-    p.header("PKG", "Tax Return Filing Package", year, "Prepared with TaxPrep",
-             sub=f"Prepared for {taxpayer.get('first_name','')} {taxpayer.get('last_name','')}")
-
-    p.section("Refund Summary")
-    fr, sr = fed["lines"]["refund"], st["lines"]["refund"]
-    p.line("FED", f"Federal ({fed['form']}): " + ("refund" if fr >= 0 else "amount you owe"), abs(fr), bold=True)
-    st_code = st.get("state", "CA")
-    if st["form"] == "none":
-        p.line(st_code, f"{st_code}: no state income tax return required", 0, bold=True)
-    else:
-        p.line(st_code, f"{st_code} ({st['form']}): " + ("refund" if sr >= 0 else "amount you owe"), abs(sr), bold=True)
-
-    p.section("Residency Determination")
-    p.text(result["residency"]["label"], bold=True, size=8.5)
-    for chunk in _wrap(result["residency"]["explanation"], 118):
-        p.text(chunk, size=7.5, gap=9.5)
-
-    p.section("How Your Tax Was Calculated")
-    for e in fed["explanations"] + st["explanations"]:
-        for i, chunk in enumerate(_wrap(("• " if True else "") + e, 118)):
-            p.text(chunk if i == 0 else "   " + chunk, size=7.5, gap=9.5)
-
-    p.section("Filing Checklist")
-    for item in checklist:
-        p.checks("", [(item, False)])
-
-    p.section("Mailing Addresses & Payment")
-    if fed["form"] == "1040-NR":
-        p.text("Federal: Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0215", size=8)
-    elif fr >= 0:
-        p.text("Federal (refund): Department of the Treasury, Internal Revenue Service, Fresno, CA 93888-0002", size=8)
-    else:
-        p.text("Federal (payment): Internal Revenue Service, P.O. Box 802501, Cincinnati, OH 45280-2501", size=8)
-        p.text("Pay online at irs.gov/payments, or enclose a check payable to 'United States Treasury' with Form 1040-V.", size=8)
-    if st["form"] != "none":
-        if st_code == "NY":
-            if sr >= 0:
-                p.text("New York (refund): State Processing Center, PO Box 61000, Albany, NY 12261-0001", size=8)
-            else:
-                p.text("New York (payment): State Processing Center, PO Box 15555, Albany, NY 12212-5555", size=8)
-        else:
-            if sr >= 0:
-                p.text("California (refund): Franchise Tax Board, PO Box 942840, Sacramento, CA 94240-0001", size=8)
-            else:
-                p.text("California (payment): Franchise Tax Board, PO Box 942867, Sacramento, CA 94267-0001", size=8)
-                p.text("Pay online at ftb.ca.gov/pay, or enclose a check payable to 'Franchise Tax Board' with Form FTB 3582.", size=8)
-    p.text("Track your federal refund at irs.gov/refunds; your state refund on the state tax agency website.", size=8)
-    p.footer("PKG", 1, 1)
-    c.showPage()
-
-
-def _wrap(s, n):
+def _wrap(s, n=118):
     out, line = [], ""
-    for w in s.split():
+    for w in str(s).split():
         if len(line) + len(w) + 1 > n:
-            out.append(line)
-            line = w
+            out.append(line); line = w
         else:
             line = (line + " " + w).strip()
     if line:
@@ -245,16 +57,157 @@ def _wrap(s, n):
     return out
 
 
-def build_package(taxpayer: dict, profile: dict, result: dict, year: int = 2025) -> bytes:
-    """Assemble the complete filing package as a single PDF (bytes)."""
+def _cover(taxpayer, result, year, included, missing) -> bytes:
     buf = io.BytesIO()
     c = _canvas.Canvas(buf, pagesize=letter)
     c.setTitle(f"Tax Return Filing Package — TY{year}")
-    _cover(c, taxpayer, result, year)
-    f1040(c, taxpayer, result["federal"], year)
-    if result["residency"].get("form_8843_required"):
-        f8843(c, taxpayer, profile, year)
-    if result["state"]["form"] != "none":
-        state_form(c, taxpayer, result["state"], result["federal"], year)
+    p = _Pager(c, year)
+    fed, st = result["federal"], result["state"]
+    p.header("PKG", "Filing Instructions & Summary", year, "Prepared with TaxPrep — keep this page, do not mail it",
+             sub=f"Prepared for {taxpayer.get('first_name', '')} {taxpayer.get('last_name', '')}")
+    p.section("Result")
+    fr = fed["lines"]["refund"]
+    p.line("FED", f"Federal Form {fed['form']} ({FS_LABELS.get(fed['filing_status'], '')}): "
+           + ("refund" if fr >= 0 else "amount you owe"), abs(fr), bold=True)
+    if st["form"] != "none":
+        sr = st["lines"]["refund"]
+        p.line(st["state"], f"{st['state']} Form {st['form']}: " + ("refund" if sr >= 0 else "amount you owe"),
+               abs(sr), bold=True)
+    else:
+        p.text(f"{st['state']}: no state income tax return required.", size=8)
+
+    p.section("Residency determination")
+    p.text(result["residency"]["label"], bold=True, size=8.5)
+    for chunk in _wrap(result["residency"]["explanation"]):
+        p.text(chunk, size=7.5, gap=9.5)
+
+    warnings = (fed.get("warnings") or []) + (st.get("warnings") or [])
+    if warnings or missing:
+        p.section("Review before filing")
+        for w in warnings:
+            for i, chunk in enumerate(_wrap("! " + w, 116)):
+                p.text(chunk if i == 0 else "   " + chunk, size=7.5, gap=9.5)
+        for m in missing:
+            for i, chunk in enumerate(_wrap(f"! Not generated — complete and attach yourself: {m}", 116)):
+                p.text(chunk if i == 0 else "   " + chunk, size=7.5, gap=9.5)
+
+    p.section("How your tax was calculated")
+    for e in fed["explanations"] + st["explanations"]:
+        for i, chunk in enumerate(_wrap("• " + e)):
+            p.text(chunk if i == 0 else "   " + chunk, size=7.5, gap=9.5)
+
+    p.section("What is in this package (official forms, filled in)")
+    for f in included:
+        p.text("• " + f, size=8)
+
+    p.section("Filing checklist")
+    for item in result["checklist"]:
+        p.need(16)
+        p.checks("", [(item, False)])
+
+    p.section("Where and when to mail")
+    mail = result.get("mailing") or {}
+    if mail.get("federal"):
+        p.text(f"Federal: {mail['federal']}", size=8)
+    if mail.get("state"):
+        p.text(f"{st['state']}: {mail['state']}", size=8)
+    p.text("Federal due date: April 15, 2026 (June 15, 2026 for nonresident aliens who had no wages subject to "
+           "U.S. withholding). Form 8843 filed alone: June 15, 2026.", size=7.5)
+    p.text("Sign and date each return. Attach W-2 Copy B (and Forms 1042-S) to the federal return and W-2 Copy 2 "
+           "to the state return. Keep copies of everything.", size=7.5)
+    p.footer("instructions", p.page)
+    c.showPage()
     c.save()
     return buf.getvalue()
+
+
+def _dual_statement(taxpayer, result, year) -> bytes:
+    """Dual-status statement page (Pub. 519, ch. 6): nonresident-period details."""
+    buf = io.BytesIO()
+    c = _canvas.Canvas(buf, pagesize=letter)
+    p = _Pager(c, year)
+    fed, res = result["federal"], result["residency"]
+    p.header("STMT", "Dual-Status Statement — attach to Form 1040", year,
+             "Department of the Treasury—Internal Revenue Service",
+             sub=f"{taxpayer.get('first_name', '')} {taxpayer.get('last_name', '')}   SSN/ITIN {taxpayer.get('ssn', '')}")
+    p.section("Residency")
+    p.text(f"Nonresident alien from January 1, {year} to the day before {res.get('residency_start')}; resident alien "
+           f"from {res.get('residency_start')} to December 31, {year}.", size=8)
+    p.section("Nonresident-period income (Form 1040-NR statement)")
+    L = fed["lines"]
+    p.line("1a", "Wages earned while a nonresident (effectively connected)", result.get("_wages_nr_period", 0))
+    p.line("1k", "Treaty-exempt income (nonresident period)", L.get("treaty_exempt_income", 0))
+    p.text("All other income shown on Form 1040 was received while a resident alien.", size=8)
+    p.section("Notes")
+    for t in ["Dual-status return: standard deduction not allowed; tax computed on combined taxable income "
+              "using the rate schedules for your filing status.",
+              "If you are married to a U.S. citizen/resident you may instead elect to be treated as a resident for "
+              "the whole year and file jointly (IRC 6013(g)/(h)) — not prepared here."]:
+        for chunk in _wrap(t):
+            p.text(chunk, size=7.5, gap=9.5)
+    p.signature()
+    p.footer("STMT", 1, 1)
+    c.showPage(); c.save()
+    return buf.getvalue()
+
+
+def build_package(taxpayer: dict, profile: dict, result: dict, year: int = 2025) -> bytes:
+    fed, st, res = result["federal"], result["state"], result["residency"]
+    out = pymupdf.open()
+    included, missing = [], []
+    parts: list[pymupdf.Document] = []
+
+    def add(doc, label):
+        parts.append(doc); included.append(label)
+
+    mode = fed.get("mode", "resident")
+    if mode == "nonresident":
+        add(official.form_1040nr(year, taxpayer, fed), "Form 1040-NR")
+    else:
+        fed_d = dict(fed, _residency_start=res.get("residency_start", ""))
+        add(official.form_1040(year, taxpayer, fed_d, dual=(mode == "dual_status")),
+            "Form 1040" + (" (Dual-Status Return)" if mode == "dual_status" else ""))
+    L = fed["lines"]
+    if L.get("other_income") or L.get("adjustments"):
+        add(official.schedule_1(year, taxpayer, fed), "Schedule 1 (Form 1040)")
+    if "Schedule 2" in fed.get("schedules", []):
+        add(official.schedule_2(year, taxpayer, fed), "Schedule 2 (Form 1040)")
+    if mode == "nonresident":
+        if L.get("nec_tax"):
+            add(official.schedule_nec(year, taxpayer, fed), "Schedule NEC (Form 1040-NR)")
+        add(official.schedule_oi(year, taxpayer, profile, fed, res), "Schedule OI (Form 1040-NR)")
+    if mode == "dual_status":
+        doc = pymupdf.open("pdf", _dual_statement(taxpayer, dict(result, _wages_nr_period=result.get("_wages_nr_period", 0)), year))
+        add(doc, "Dual-status statement")
+    if res.get("form_8843_required"):
+        add(official.form_8843(year, taxpayer, profile, res), "Form 8843")
+
+    # schedules the engine says are needed but that are not generated here
+    generated = {"Schedule 1", "Schedule 2", "Schedule NEC (Form 1040-NR)", "Schedule OI (Form 1040-NR)",
+                 "Form 1040-NR (dual-status statement)"}
+    for s in fed.get("schedules", []):
+        if s not in generated:
+            missing.append(s)
+
+    if st["form"] != "none":
+        ca_in = {"dependents": result.get("_dependents", 0), "state_wages": result.get("_state_wages", 0),
+                 "health_coverage": profile.get("health_coverage", True), "std": result.get("_state_std", 0)}
+        if st["state"] == "CA":
+            if st["form"] == "540":
+                add(official.ca_540(year, taxpayer, fed, st, ca_in), "California Form 540")
+            else:
+                add(official.ca_540nr(year, taxpayer, fed, st, ca_in), "California Form 540NR")
+            if abs(st["lines"].get("ca_agi", 0) - L["agi"]) >= 1 or st["form"] == "540NR":
+                missing.append("California Schedule CA (" + ("540" if st["form"] == "540" else "540NR") +
+                               ") — shows the adjustments on lines 14/16")
+        elif st["state"] == "NY":
+            if st["form"] == "IT-201":
+                add(official.ny_it201(year, taxpayer, fed, st, ca_in), "New York Form IT-201")
+            else:
+                add(official.ny_it203(year, taxpayer, fed, st, ca_in), "New York Form IT-203")
+
+    out.insert_pdf(pymupdf.open("pdf", _cover(taxpayer, result, year, included, missing)))
+    for d in parts:
+        out.insert_pdf(d)
+    out.set_metadata({"title": f"Tax Return Filing Package — TY{year}", "producer": "TaxPrep"})
+    return out.tobytes(garbage=3, deflate=True)

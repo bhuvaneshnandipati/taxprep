@@ -11,7 +11,7 @@ class Settings:
     DATABASE_URL = _normalize_db_url(os.getenv("DATABASE_URL", "sqlite:///./taxprep.db"))
     JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-in-prod")
     JWT_ALG = "HS256"
-    ACCESS_TOKEN_MINUTES = int(os.getenv("ACCESS_TOKEN_MINUTES", "30"))
+    ACCESS_TOKEN_MINUTES = int(os.getenv("ACCESS_TOKEN_MINUTES", "240"))
     DEFAULT_TAX_YEAR = 2025
     # "require" is correct for managed Postgres (Neon/Render/Supabase). Set
     # DB_SSLMODE=disable for a self-hosted Postgres (e.g. reached via an ngrok
@@ -22,3 +22,8 @@ class Settings:
     CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",")]
 
 settings = Settings()
+
+_WEAK = {"dev-secret-change-in-prod", "change-me", "", "secret"}
+if (os.getenv("RENDER") or os.getenv("PRODUCTION")) and settings.JWT_SECRET in _WEAK:
+    raise RuntimeError("JWT_SECRET is not set to a strong random value in production — refusing to start "
+                       "(anyone could forge login tokens).")

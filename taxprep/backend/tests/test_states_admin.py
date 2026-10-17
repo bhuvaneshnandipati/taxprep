@@ -13,14 +13,26 @@ def test_ny_it201():
     out = compute_state(StateInput(state="NY", withholding=4000), FED)
     assert out.form == "IT-201"
     taxable = 80000 - 8000
-    assert out.lines["37_taxable"] == taxable
-    assert out.lines["39_tax"] == round(marginal_tax(taxable, load_rules("newyork")["brackets"]["single"]))
+    assert out.lines["taxable_income"] == taxable
+    assert out.lines["tax"] == round(marginal_tax(taxable, load_rules("newyork")["brackets"]["single"]))
+
+def test_ny_hand_calc_60k():
+    fed = compute_federal(FederalInput(wages=60000), RES)
+    out = compute_state(StateInput(state="NY"), fed)
+    assert out.lines["taxable_income"] == 52000 and out.lines["tax"] == 2695
+
+def test_ny_tax_benefit_recapture():
+    fed = compute_federal(FederalInput(wages=130000), RES)
+    out = compute_state(StateInput(state="NY", itemized=8000), fed)
+    assert out.lines["taxable_income"] == 122000 and out.lines["tax"] == 7006
 
 def test_ny_it203_proration():
     full = compute_state(StateInput(state="NY"), FED)
     half = compute_state(StateInput(state="NY", full_year_resident=False, income_ratio=0.5), FED)
     assert half.form == "IT-203"
-    assert half.lines["39_tax"] == pytest.approx(full.lines["39_tax"] * 0.5, abs=1)
+    assert half.lines["tax"] == pytest.approx(full.lines["tax"] * 0.5, abs=1)
+    exact = compute_state(StateInput(state="NY", full_year_resident=False, state_source_income=20000), FED)
+    assert exact.lines["income_percentage"] == 0.25
 
 def test_no_tax_state():
     out = compute_state(StateInput(state="TX", withholding=0), FED)
@@ -42,18 +54,19 @@ def test_treaty_expansion():
 def test_dual_status_flag():
     r = determine_residency(citizen=False, green_card=False, visa="H-1B",
                             first_entry_year=2025, days_current=200)
-    assert r.status == "resident" and r.dual_status_possible
+    assert r.status == "dual_status" and r.dual_status_possible and r.warnings  # start date estimated
 
 def test_admin_rbac_and_endpoints():
-    os.environ["DATABASE_URL"] = "sqlite:///./test_admin.db"
-    os.environ["ADMIN_EMAILS"] = "boss@test.com"
     from fastapi.testclient import TestClient
     from app.main import app
     c = TestClient(app)
     user_tok = {"Authorization": "Bearer " + c.post("/auth/register",
                 json={"email": "pleb@test.com", "password": "password123"}).json()["access_token"]}
+    # reserved admin email cannot be registered without the setup code (prevents admin takeover)
+    assert c.post("/auth/register", json={"email": "boss@test.com", "password": "password123"}).status_code == 403
     admin_tok = {"Authorization": "Bearer " + c.post("/auth/register",
-                 json={"email": "boss@test.com", "password": "password123"}).json()["access_token"]}
+                 json={"email": "boss@test.com", "password": "password123",
+                       "admin_code": "test-setup-code"}).json()["access_token"]}
     assert c.get("/admin/users", headers=user_tok).status_code == 403
     users = c.get("/admin/users", headers=admin_tok).json()
     assert len(users) >= 2 and any(u["email"] == "pleb@test.com" for u in users)
@@ -69,8 +82,6 @@ def test_admin_rbac_and_endpoints():
     assert c.get("/admin/users", headers=user_tok).status_code == 200
 
 def test_calculate_with_ny():
-    os.environ["DATABASE_URL"] = "sqlite:///./test_ny_api.db"
-    os.environ.pop("ADMIN_EMAILS", None)
     from fastapi.testclient import TestClient
     from app.main import app
     c = TestClient(app)

@@ -52,7 +52,17 @@ def review(rid: int, doc_id: int, corrections: dict,
     if not d:
         raise HTTPException(404, "Document not found")
     ex = dict(d.extracted)
+    doc_type = corrections.pop("doc_type", None)
+    if doc_type is not None:
+        if doc_type not in ("W-2", "1099-INT", "1099-DIV", "1099-NEC"):
+            raise HTTPException(400, "doc_type must be W-2, 1099-INT, 1099-DIV or 1099-NEC")
+        d.doc_type = doc_type; ex["doc_type"] = doc_type
     for k, v in corrections.items():
+        if k not in ("employer", "ein", "state"):
+            try:
+                v = float(str(v).replace(",", "").replace("$", "").strip() or 0)
+            except ValueError:
+                raise HTTPException(400, f"'{k}' must be a number")
         ex.setdefault("fields", {})[k] = {"value": v, "confidence": 1.0, "raw": "user-corrected"}
     ex["needs_review"] = False
     d.extracted = ex; d.status = "reviewed"; db.commit()
@@ -66,12 +76,17 @@ def apply_to_return(rid: int, doc_id: int,
     d = db.query(Document).filter_by(id=doc_id, return_id=r.id).first()
     if not d:
         raise HTTPException(404, "Document not found")
+    if d.status == "applied":
+        raise HTTPException(409, "This document was already added to your return")
     f = {k: v["value"] for k, v in (d.extracted.get("fields") or {}).items()}
     inc = dict(r.income or {})
     if d.doc_type == "W-2":
-        w2s = list(inc.get("w2s") or [])
-        w2s.append({"employer": f.get("employer", ""), "wages": f.get("wages", 0),
-                    "fed_withholding": f.get("fed_withholding", 0),
+        w2s = [w for w in (inc.get("w2s") or []) if any(w.get(k) for k in ("employer", "wages", "fed_withholding"))]
+        w2s.append({"employer": f.get("employer", ""), "ein": f.get("ein", ""), "wages": f.get("wages", 0),
+                    "fed_withholding": f.get("fed_withholding", 0), "ss_wages": f.get("ss_wages", 0),
+                    "ss_tax": f.get("ss_tax", 0), "medicare_wages": f.get("medicare_wages"),
+                    "medicare_tax": f.get("medicare_tax", 0), "state": f.get("state", ""),
+                    "state_wages": f.get("state_wages", 0),
                     "state_withholding": f.get("state_withholding", 0)})
         inc["w2s"] = w2s
     elif d.doc_type == "1099-INT":
@@ -82,5 +97,7 @@ def apply_to_return(rid: int, doc_id: int,
         inc["se_income"] = (inc.get("se_income") or 0) + f.get("nonemployee_comp", 0)
     else:
         raise HTTPException(400, "Unknown document type — review and set the type first")
-    r.income = inc; d.status = "applied"; db.commit()
+    r.income = inc; d.status = "applied"
+    r.result_federal = {}; r.result_state = {}; r.status = "in_progress"
+    db.commit()
     return {"ok": True, "income": inc}

@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.db
+.pytest_cache/
+.venv/
+venv/
+node_modules/
+.next/
+.runtime/
+.test-tmp/
+*.tsbuildinfo
+.env
+.env.local
+*.yaml.bak

@@ -10,9 +10,15 @@ from ..core.retention import purge_audit_log, AUDIT_RETENTION_MONTHS
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+def bootstrap_emails() -> list[str]:
+    return [e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()]
+
+
 def require_admin(email: str = Depends(current_user_email), db: Session = Depends(get_db)) -> User:
     u = db.query(User).filter_by(email=email).first()
-    bootstrap = email in [e.strip() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()]
+    # Bootstrap admins: the account must have been registered with ADMIN_SETUP_CODE (see auth.register),
+    # otherwise anyone could register the address first and take over the admin panel.
+    bootstrap = email.lower() in bootstrap_emails() and bool(u) and getattr(u, "role", "") == "admin_pending"
     if not u or (u.role != "admin" and not bootstrap):
         raise HTTPException(403, "Admin access required")
     if bootstrap and u.role != "admin":
@@ -80,6 +86,14 @@ def update_pack(year: int, pack: str, body: dict,
         raise HTTPException(404, f"No pack '{pack}' for {year}")
     if not isinstance(body, dict) or body.get("year") != year:
         raise HTTPException(400, "Pack payload must be an object with matching 'year'")
+    if pack == "questions":
+        from ..engines.interview import evaluate
+        for q in body.get("questions", []):
+            if q.get("show_if"):
+                try:
+                    evaluate(q["show_if"], {})
+                except Exception as e:
+                    raise HTTPException(400, f"Question '{q.get('id')}': invalid show_if ({e})")
     path.with_suffix(".yaml.bak").write_text(path.read_text())
     path.write_text(yaml.safe_dump(body, sort_keys=False))
     load_rules.cache_clear()

@@ -1,0 +1,24 @@
+year: 2025
+# Source: irs.gov "Where to file paper tax returns" and "Where to file – forms beginning with 1" (checked 2026-10-04);
+# Pub. 519 (dual-status returns go to the 1040-NR addresses); FTB 540/540NR and NY IT-201/IT-203 instructions.
+federal:
+  "1040-NR":
+    no_payment: "Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0215"
+    payment: "Internal Revenue Service, P.O. Box 1303, Charlotte, NC 28201-1303"
+  "1040 (Dual-Status)":
+    no_payment: "Department of the Treasury, Internal Revenue Service, Austin, TX 73301-0215"
+    payment: "Internal Revenue Service, P.O. Box 1303, Charlotte, NC 28201-1303"
+  "8843-only": "Department of the Treasury, Internal Revenue Service Center, Austin, TX 73301-0215"
+  "1040":
+    CA: { no_payment: "Department of the Treasury, Internal Revenue Service, Ogden, UT 84201-0002",
+          payment: "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000" }
+    NY: { no_payment: "Department of the Treasury, Internal Revenue Service, Kansas City, MO 64999-0002",
+          payment: "Internal Revenue Service, P.O. Box 931000, Louisville, KY 40293-1000" }
+    default: "See irs.gov/filing/where-to-file-paper-tax-returns-with-or-without-a-payment for your state."
+state:
+  CA:
+    no_payment: "Franchise Tax Board, PO Box 942840, Sacramento, CA 94240-0001"
+    payment: "Franchise Tax Board, PO Box 942867, Sacramento, CA 94267-0001"
+  NY:
+    no_payment: "State Processing Center, PO Box 61000, Albany, NY 12261-0001"
+    payment: "State Processing Center, PO Box 15555, Albany, NY 12212-5555"

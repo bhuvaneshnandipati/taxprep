@@ -14,7 +14,6 @@ def test_months_ago_clamps_day_overflow():
     assert cutoff.year == 2026 and cutoff.month == 2 and cutoff.day == 28
 
 def test_purge_removes_only_old_entries():
-    os.environ["DATABASE_URL"] = "sqlite:///./test_retention.db"
     from app.db.session import SessionLocal, Base, engine
     from app.db.models import AuditLog
     Base.metadata.create_all(bind=engine)
@@ -32,13 +31,11 @@ def test_purge_removes_only_old_entries():
     db.close()
 
 def test_admin_audit_endpoint_shape_and_purge_route():
-    os.environ["DATABASE_URL"] = "sqlite:///./test_retention_api.db"
-    os.environ["ADMIN_EMAILS"] = "boss2@test.com"
     from fastapi.testclient import TestClient
     from app.main import app
     c = TestClient(app)
     tok = {"Authorization": "Bearer " + c.post("/auth/register",
-           json={"email": "boss2@test.com", "password": "password123"}).json()["access_token"]}
+           json={"email": "boss2@test.com", "password": "password123", "admin_code": "test-setup-code"}).json()["access_token"]}
     out = c.get("/admin/audit", headers=tok).json()
     assert out["retention_months"] == AUDIT_RETENTION_MONTHS
     assert isinstance(out["entries"], list)

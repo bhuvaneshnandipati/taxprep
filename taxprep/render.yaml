@@ -11,7 +11,11 @@ services:
       - key: JWT_SECRET
         generateValue: true  # Render auto-generates a random secret
       - key: ADMIN_EMAILS
-        sync: false          # optional: comma-separated emails to auto-promote to admin
+        sync: false          # optional: comma-separated admin emails (registration needs ADMIN_SETUP_CODE)
+      - key: ADMIN_SETUP_CODE
+        generateValue: true  # copy it from the Render dashboard; enter it once when registering the admin email
+      - key: DATA_KEY
+        sync: false          # Fernet key for SSN/passport encryption — see DEPLOY.md step 2
       - key: CORS_ORIGINS
         sync: false          # set to your Vercel URL once you have it, e.g. https://taxprep.vercel.app
       - key: DB_SSLMODE

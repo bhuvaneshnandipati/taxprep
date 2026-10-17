@@ -1,19 +1,37 @@
 year: 2025
 # Treaty benefit rules keyed by country. article/benefit codes drive engine logic.
+# Source: IRS Pub. 901 (U.S. Tax Treaties) and IRS Tax Treaty Tables. Form 8833 is NOT required for
+# treaty claims on dependent personal services / student income by a nonresident alien
+# (Reg. 301.6114-1(c)(1)(ii)); it IS required when a resident alien uses a saving-clause exception.
+# resident_alien_ok: benefit survives becoming a resident alien under the SPT (saving-clause exception).
+
+# Portfolio dividend withholding rates (IRS Tax Treaty Table 1, income code 06). Default 30%.
+dividend_rates:
+  Canada: 0.15
+  China: 0.10
+  France: 0.15
+  Germany: 0.15
+  India: 0.25
+  Japan: 0.10
+  Mexico: 0.10
+  Philippines: 0.25
+  South Korea: 0.15
+  United Kingdom: 0.15
+
 treaties:
   India:
     - { article: "21(2)", benefit: standard_deduction, applies_to: [student], form_8833_required: false,
         note: "Students/business apprentices may claim the U.S. standard deduction on Form 1040-NR." }
   China:
-    - { article: "20(c)", benefit: wage_exemption, amount: 5000, applies_to: [student], form_8833_required: false,
+    - { article: "20(c)", benefit: wage_exemption, amount: 5000, applies_to: [student], form_8833_required: false, resident_alien_ok: true,
         note: "Up to $5,000 of personal-service income exempt for students; survives residency change per protocol." }
-    - { article: "20(b)", benefit: scholarship_exemption, amount: null, applies_to: [student], form_8833_required: false,
+    - { article: "20(b)", benefit: scholarship_exemption, amount: null, applies_to: [student], form_8833_required: false, resident_alien_ok: true,
         note: "Scholarship/fellowship grants exempt." }
   South Korea:
     - { article: "21(1)", benefit: wage_exemption, amount: 2000, applies_to: [student], form_8833_required: false,
         note: "Up to $2,000 of personal-service income exempt for students." }
   Canada:
-    - { article: "XV", benefit: wage_exemption_threshold, amount: 10000, applies_to: [employee], form_8833_required: true,
+    - { article: "XV", benefit: wage_exemption_threshold, amount: 10000, applies_to: [employee], form_8833_required: false,
         note: "Employment income exempt if total is $10,000 or less." }
   Germany:
     - { article: "20(4)", benefit: wage_exemption, amount: 9000, applies_to: [student], form_8833_required: false,

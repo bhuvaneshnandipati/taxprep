@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from ..engines.interview import next_questions, progress
 from ..engines.rules_loader import load_rules, available_years
 
@@ -14,4 +14,7 @@ def years():
 
 @router.get("/rules/{pack}")
 def rules(pack: str, year: int = 2025):
-    return load_rules(pack, year)
+    try:
+        return load_rules(pack, year)
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))

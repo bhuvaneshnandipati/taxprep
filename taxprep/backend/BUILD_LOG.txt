@@ -116,3 +116,56 @@ AUDIT LOG RETENTION (2026-07-05)
 + Frontend: admin Audit tab shows retention note + "Purge now" button
 TESTS: 4 new (month-rollover math incl. year boundary, day-overflow clamping, purge deletes only entries older than cutoff w/ fabricated timestamps, admin endpoint shape + purge route + purge-action self-logging) -> 46/46 passing
 NOTE: audit log is the only unbounded table in the schema; tax returns/documents are naturally bounded by active users, so no retention policy was needed there.
+
+======================================================================================
+AUDIT + FIX PASS (2026-10-04) — see ../FIXES.md for the user-facing summary
+======================================================================================
+FINDING: the 46 passing tests encoded wrong behaviour (e.g. test_full_journey asserted that a
+nonresident's bank interest is taxable). Tests were rewritten against hand calculations.
+
+RESIDENCY (app/engines/residency.py — rewritten)
+- exempt days excluded in all 3 look-back years; 5-yr student / 2-of-6 teacher rules per year
+- new inputs: exempt_days_current/prior1/prior2, prior_exempt_years, first_nonexempt_day
+- new status "dual_status" (form "1040 (Dual-Status)") replaces "full-year resident" assumption
+CHECK: F-1 since 2021 -> H-1B 2025-10-01: 273 exempt days -> 92 counted -> nonresident (test).
+
+FEDERAL (app/engines/federal.py — rewritten; semantic line keys)
+- Tax Table midpoint method (<$100k): band 44,250-44,300 single -> tax on 44,275 = 1,192.50 +
+  32,350 x 12% = 5,074.50 -> 5,075 (half-up). 29,250-29,300 -> 3,274.50 -> 3,275.
+- NRA: interest excluded; dividends -> Sch NEC at 30%/treaty rate; capital gains -> Sch NEC 30% only
+  if 183+ days; SE profit = ECI without SE tax; 1042-S comp/scholarship/withholding; itemized =
+  state tax (box 17) + charity; China/1042-S double-exemption guard.
+- capital loss limit 3,000/1,500; net capital gain = min(LT, LT+ST)
+- credit order: education (nonref) -> ODC -> CTC; ACTC 15% x (earned - 2,500)
+  CHECK HOH $25,000, 2 kids: TI 1,375 -> tax 139; ACTC = min(4,261, 3,400, 3,375) = 3,375;
+  EIC on 25,025 midpoint: 7,152 - (25,025-23,350) x 21.06% = 6,799.
+- EITC age 25-64 without children; SE $400 floor; OBBBA SALT cap & Schedule 1-A tips/overtime.
+CALIFORNIA (FTB Tax News Oct-2025 indexed amounts)
+- brackets single 11,079/26,264/41,452/57,542/72,724/371,479/445,771/742,953; std 5,706/11,412;
+  credits 153 / dependent 475; phase-out 252,203/504,411/378,310 ($6 per $2,500); renter 53,994/107,988
+- CA AGI rebuilt worldwide: treaty-exempt wages/scholarship + NRA interest/dividends/gains added back
+  CHECK 540 single 60,000: TI 54,294 -> 110.79+303.70+607.52+770.52 = 1,792.53 -> 1,793; -153 = 1,640
+  CHECK 540NR 100,000 total / 50,000 CA: tax 5,207.98 on 94,294 -> rate .0552; CA TI 47,147 -> 2,602.51;
+        credits 153 x .5 = 76.50 -> 2,526
+NEW YORK: recapture tier 1 (flat marginal rate phased over $50k above NYAGI 107,650)
+  CHECK AGI 130,000, TI 122,000: 6,751.75 + (7,320 - 6,751.75) x .447 = 7,005.76 -> 7,006
+  CHECK TI 52,000: 340 + 144 + 115.50 + 2,095.50 = 2,695
+
+OFFICIAL FORMS (app/pdf/fill.py, official.py, forms.py; PyMuPDF)
+- templates: IRS f1040, f1040nr, f1040s1, f1040nrn (Sch NEC), f1040nro (Sch OI), f8843; FTB 2025-540,
+  2025-540nr; NY it201_fill_in, it203_fill_in — all TY2025, downloaded 2026-10-04 by the user (the
+  sandbox network blocks .gov hosts).
+- field maps built by overlaying field names on rendered pages and reading the labels (1040 page 2 is
+  now 11b/12e/13a/13b/14/15; 1040-NR 1k treaty, 13c Sch 1-A, 23a NEC, 25g 1042-S).
+- fill_pdf() raises KeyError on unknown field names (template drift can't silently drop values);
+  radio groups set only the chosen button; each form is baked (flattened) before merging because
+  agencies reuse field names (IRS "f1_01[0]") across forms.
+- 8843 instruction pages (3-4) removed; dual-status stamp in top margin + statement page.
+DEBUG: package test matched the cover sheet instead of the form page -> lookups skip page 0.
+DEBUG: NY-source income could exceed federal AGI when treaty-exempt wages were in W-2 box 16 -> capped.
+
+SECURITY: admin bootstrap requires ADMIN_SETUP_CODE; eval() removed from interview; DATA_KEY Fernet
+encryption of ssn/passport_number; JWT_SECRET guard on Render; pydantic validation; pack-name regex.
+FRONTEND: resume via GET /returns/{id}; inputs moved to module-level components (focus bug);
+decimal/negative money input; 8843/Schedule OI detail fields; state-generic labels; delete return.
+TESTS: 78/78 passing.

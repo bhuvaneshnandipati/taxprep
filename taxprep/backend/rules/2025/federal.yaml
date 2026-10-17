@@ -57,8 +57,31 @@ niit:
   rate: 0.038
   magi_threshold: { single: 200000, mfj: 250000, mfs: 125000, hoh: 200000, qss: 250000 }
 
+capital_loss_limit: { single: 3000, mfj: 3000, mfs: 1500, hoh: 3000, qss: 3000 }
+
+# One Big Beautiful Bill Act (P.L. 119-21) — 2025 SALT cap and Schedule 1-A deductions
+salt_cap:
+  cap: { single: 40000, mfj: 40000, mfs: 20000, hoh: 40000, qss: 40000 }
+  floor: { single: 10000, mfj: 10000, mfs: 5000, hoh: 10000, qss: 10000 }
+  phase_down_magi: { single: 500000, mfj: 500000, mfs: 250000, hoh: 500000, qss: 500000 }
+  phase_down_rate: 0.30
+
+schedule_1a:
+  tips:     { cap: 25000, cap_mfj: 25000 }
+  overtime: { cap: 12500, cap_mfj: 25000 }
+  phaseout_magi: { single: 150000, mfj: 300000, hoh: 150000, qss: 150000 }
+  phaseout_per_1000: 100
+  mfs_allowed: false
+  ssn_required: true
+
+se_minimum_net_earnings: 400
+
+eitc_age_no_children: [25, 64]
+
 nra:
   standard_deduction_allowed: false
   filing_statuses: [single, mfs, qss]
-  # FDAP default flat rate on non-effectively-connected US-source investment income
+  # FDAP flat rate on US-source income NOT effectively connected (Schedule NEC) unless a treaty lowers it
   fdap_default_rate: 0.30
+  capital_gains_rate: 0.30
+  capital_gains_days_threshold: 183

@@ -30,13 +30,13 @@ export async function login(email: string, password: string) {
   const body = new URLSearchParams({ username: email, password });
   const res = await fetch(`${BASE}/auth/login`, { method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
-  if (!res.ok) throw new Error("Incorrect email or password");
+  if (!res.ok) throw new Error(res.status === 401 ? "Incorrect email or password" : `Sign-in failed (${res.status}). The server may be waking up — try again in 30 seconds.`);
   setToken((await res.json()).access_token);
 }
-export async function register(email: string, password: string, full_name: string) {
+export async function register(email: string, password: string, full_name: string, admin_code = "") {
   const res = await fetch(`${BASE}/auth/register`, { method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, full_name }) });
+    body: JSON.stringify({ email, password, full_name, admin_code }) });
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || "Registration failed");
   setToken((await res.json()).access_token);
 }
@@ -45,14 +45,15 @@ export async function downloadPackage(rid: number, year: number) {
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = `filing-package-${year}.pdf`; a.click();
-  URL.revokeObjectURL(url);
+  a.href = url; a.download = `tax-return-${year}.pdf`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);   // revoking synchronously cancels the download in some browsers
 }
 
 export async function uploadDocument(rid: number, file: File) {
   const fd = new FormData();
   fd.append("file", file);
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/returns/${rid}/documents`, {
+  const res = await fetch(`${BASE}/returns/${rid}/documents`, {
     method: "POST",
     headers: token() ? { Authorization: `Bearer ${token()}` } : {},
     body: fd,

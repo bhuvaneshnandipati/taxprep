@@ -52,7 +52,8 @@ def to_page_images(data: bytes, filename: str) -> list[bytes]:
 
 # ---------- field parsing ----------
 
-MONEY = re.compile(r"\$?\s?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?|\d+\.\d{2})")
+# Comma-grouped amounts first, then plain digit runs (so "48250.00" / "48250" are not split into "482"+"50").
+MONEY = re.compile(r"(?<![\d.,])\$?\s?(\d{1,3}(?:,\d{3})+(?:\.\d{2})?|\d+(?:\.\d{2})?)(?![\d,])")
 EIN = re.compile(r"\b(\d{2}\s?-\s?\d{7})\b")
 SSN = re.compile(r"\b(\d{3}-\d{2}-\d{4})\b")
 
@@ -64,7 +65,8 @@ W2_FIELDS = {
     "ss_tax":             ["social security tax withheld"],
     "medicare_wages":     ["medicare wages"],
     "medicare_tax":       ["medicare tax withheld"],
-    "state_withholding":  ["state income tax", "state tax"],
+    "state_wages":        ["state wages, tips", "state wages"],
+    "state_withholding":  ["state income tax", "state tax withheld"],
     "retirement_401k":    ["401k", "401(k)", "12a"],
 }
 
@@ -157,7 +159,16 @@ def parse_document(text: str, doc_type: str | None = None) -> dict:
             "low_confidence_fields": low_conf}
 
 
+def _register_heif():
+    try:  # HEIC photos from iPhones
+        from pillow_heif import register_heif_opener
+        register_heif_opener()
+    except Exception:
+        pass
+
+
 def process_upload(data: bytes, filename: str) -> dict:
+    _register_heif()
     extractor = get_extractor()
     text = "\n".join(extractor.extract_text(p) for p in to_page_images(data, filename))
     out = parse_document(text)
