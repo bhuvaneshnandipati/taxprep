@@ -1,7 +1,7 @@
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 from pydantic import BaseModel, EmailStr, Field
 
-Money = float
+Money = Annotated[float, Field(allow_inf_nan=False)]
 NonNeg = Field(default=0, ge=0)
 
 

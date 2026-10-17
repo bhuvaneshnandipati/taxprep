@@ -5,10 +5,7 @@ Application source is in `taxprep/`.
 
 ## Use as a hosted website
 
-Visitors can use TaxPrep in a mobile or desktop browser without installing any
-software. Follow [website publishing setup](WEBSITE.md) for native Render hosting.
-GitHub is connected and the Render database exists; the public website deployment
-is in progress. See [the work log](WORK_LOG.md) for the latest verified status.
+An existing frontend is at https://taxprep-mu.vercel.app. Its hosted backend and database are not yet verified. Use synthetic test data only. [Website setup](WEBSITE.md) documents the free Vercel + Neon personal-preview route and the pending Neon authorization. Render is excluded.
 
 ## Run locally
 
@@ -57,13 +54,6 @@ See [audit and remaining limitations](taxprep/FIXES.md) and
 
 ## Validation and remaining work
 
-October 16, 2026: backend suite **78 passed, 2 skipped** (Tesseract-dependent image
-tests); frontend production build passed; both Schedule 2 pages rendered and inspected.
-Schedule 2 line-placement tests reopen the saved PDF and check the numeric fields.
+October 16, 2026: 93 backend checks passed; 2 image-OCR checks skipped without Tesseract. The suite covers engine examples, API authorization, encrypted identifiers, PDF field mapping, and new production-configuration/password/finite-money protections. Frontend production build passed. A local browser E2E using synthetic data verified registration, profile/residency, calculation, PDF download, sign-out/sign-in, and saved-return resume. The $45,000 single-citizen sample produced $925 federal and $617 CA refunds.
 
-The upgraded frontend production dependency audit reported zero vulnerabilities.
-The full audit still reports seven development-tool findings (five high and two
-moderate); these need separate review. Supplemental forms other than Schedule 2
-remain subject to the limitations in the audit report. Deployment and end-to-end
-checks remain pending; a clean production dependency audit alone does not establish
-that the application is ready for real taxpayer data.
+Hosted E2E, independent full tax correctness, broader security review and production readiness remain unverified. See [remaining limitations](taxprep/FIXES.md). Generated PDFs are marked as synthetic test previews, not filing-ready returns.

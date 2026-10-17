@@ -14,6 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <a href="/dashboard" className="font-bold text-lg tracking-tight">TaxPrep</a>
           <span className="font-mono text-[11px] text-gray-500">TAX YEAR 2025 · FEDERAL + CA / NY</span>
         </header>
+        <p className="mx-auto max-w-5xl px-5 pt-4 text-sm" role="note">Preview for synthetic test data only. Tax coverage and security review are incomplete. Do not enter real taxpayer information or file generated forms.</p>
         {children}
       </body>
     </html>

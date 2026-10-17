@@ -144,15 +144,26 @@ def run_calculation(r: TaxReturn) -> dict:
     p = r.profile or {}
     inc = IncomeIn(**(r.income or {})).model_dump()
     res = residency_for(p, r.tax_year)
+    if res.status == "dual_status" and any(inc[k] for k in ("interest", "dividends", "capital_gain_lt", "capital_gain_st")):
+        raise ValueError("Dual-status investment income requires period-specific NIIT calculations not supported here.")
     w2s = inc["w2s"]
     state = (inc.get("state") or "CA").upper()
     state_wh = sum(w["state_withholding"] for w in w2s if (w.get("state") or state).upper() == state)
     all_state_tax = sum(w["state_withholding"] for w in w2s) + inc["state_tax_other"]
-    med = [w["medicare_wages"] for w in w2s]
+    med = [w["medicare_wages"] if w["medicare_wages"] is not None else w["wages"] for w in w2s]
+    # Fail closed for known unsupported credits/deductions rather than return a wrong refund.
+    if inc["age"] >= 65:
+        raise ValueError("Age 65+ deductions are not supported in this preview; calculation is blocked.")
+    if inc["education_credit_type"] == "aotc" and inc["tuition_paid"] and inc["age"] < 24:
+        raise ValueError("AOTC eligibility under age 24 requires additional support/parent information not supported here.")
+    if any(w["medicare_tax"] > med[i] * 0.0145 + 1 for i, w in enumerate(w2s)):
+        raise ValueError("Additional Medicare withholding credit is not supported; calculation is blocked.")
+    if sum(w["ss_tax"] for w in w2s) > 176100 * 0.062 + 1:
+        raise ValueError("Excess Social Security withholding credit is not supported; calculation is blocked.")
     fin = FederalInput(
         filing_status=inc["filing_status"],
         wages=sum(w["wages"] for w in w2s),
-        medicare_wages=None if all(m is None for m in med) else sum((m or 0) for m in med),
+        medicare_wages=sum(med),
         fed_withholding=sum(w["fed_withholding"] for w in w2s) + inc["withholding_1099"],
         wages_nr_period=inc["wages_nr_period"],
         comp_1042s=inc["comp_1042s"], scholarship_1042s=inc["scholarship_1042s"],

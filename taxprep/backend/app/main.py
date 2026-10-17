@@ -15,6 +15,14 @@ app.include_router(interview.router)
 app.include_router(documents.router)
 app.include_router(admin.router)
 
+@app.middleware("http")
+async def private_responses(request, call_next):
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
 @app.get("/health")
 def health():
     return {"status": "ok"}

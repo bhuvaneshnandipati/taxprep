@@ -65,6 +65,8 @@ def _cover(taxpayer, result, year, included, missing) -> bytes:
     fed, st = result["federal"], result["state"]
     p.header("PKG", "Filing Instructions & Summary", year, "Prepared with TaxPrep — keep this page, do not mail it",
              sub=f"Prepared for {taxpayer.get('first_name', '')} {taxpayer.get('last_name', '')}")
+    p.section("SYNTHETIC TEST PREVIEW - DO NOT FILE")
+    p.text("Tax coverage and correctness review are incomplete. This package is not ready for filing.", size=8)
     p.section("Result")
     fr = fed["lines"]["refund"]
     p.line("FED", f"Federal Form {fed['form']} ({FS_LABELS.get(fed['filing_status'], '')}): "

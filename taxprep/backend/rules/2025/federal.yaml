@@ -20,7 +20,7 @@ child_tax_credit:
   per_child: 2200
   refundable_max_per_child: 1700
   other_dependent_credit: 500
-  phaseout_agi: { single: 200000, mfj: 400000, mfs: 200000, hoh: 200000, qss: 400000 }
+  phaseout_agi: { single: 200000, mfj: 400000, mfs: 200000, hoh: 200000, qss: 200000 }
   phaseout_rate_per_1000: 50
   earned_income_floor: 2500
   refundable_rate: 0.15
@@ -51,7 +51,7 @@ self_employment:
 
 additional_medicare:
   rate: 0.009
-  threshold: { single: 200000, mfj: 250000, mfs: 125000, hoh: 200000, qss: 250000 }
+  threshold: { single: 200000, mfj: 250000, mfs: 125000, hoh: 200000, qss: 200000 }
 
 niit:
   rate: 0.038

@@ -505,7 +505,7 @@ export default function ReturnWizard() {
         setBusy(true); setErr("");
         try { await downloadPackage(rid, TAX_YEAR); } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
       }}>{busy ? "Preparing…" : "Download filing package (PDF)"}</button>
-      <p className="text-xs text-gray-500 mb-8">Official IRS / state forms, filled in. Review every page, sign, and mail to the addresses below.</p>
+      <p className="text-xs text-gray-500 mb-8">Draft official forms for synthetic testing. Do not sign or file this preview; tax coverage and correctness review remain incomplete.</p>
       <h3 className="font-bold mb-2">How your tax was calculated</h3>
       <div className="card mb-6 space-y-2">
         {[...F!.explanations, ...C!.explanations].map((e, i) => <p key={i} className="text-sm text-gray-600">• {e}</p>)}

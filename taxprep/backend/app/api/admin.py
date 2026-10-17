@@ -94,6 +94,8 @@ def update_pack(year: int, pack: str, body: dict,
                     evaluate(q["show_if"], {})
                 except Exception as e:
                     raise HTTPException(400, f"Question '{q.get('id')}': invalid show_if ({e})")
+    if os.getenv("VERCEL"):
+        raise HTTPException(409, "Hosted rule packs are read-only. Commit reviewed rule changes and redeploy.")
     path.with_suffix(".yaml.bak").write_text(path.read_text())
     path.write_text(yaml.safe_dump(body, sort_keys=False))
     load_rules.cache_clear()

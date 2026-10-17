@@ -5,6 +5,9 @@ from ..db.session import get_db
 from ..db.models import TaxReturn, Document, AuditLog
 from ..core.security import current_user_email
 from ..ocr.service import process_upload
+from ..schemas import IncomeIn
+from pydantic import ValidationError
+import math
 
 router = APIRouter(prefix="/returns/{rid}/documents", tags=["documents"])
 ALLOWED = (".pdf", ".jpg", ".jpeg", ".png", ".heic")
@@ -22,7 +25,7 @@ async def upload(rid: int, file: UploadFile = File(...),
     r = _ret(db, email, rid)
     if not file.filename or not file.filename.lower().endswith(ALLOWED):
         raise HTTPException(400, f"Unsupported file type. Allowed: {', '.join(ALLOWED)}")
-    data = await file.read()
+    data = await file.read(MAX_BYTES + 1)
     if len(data) > MAX_BYTES:
         raise HTTPException(400, "File too large (max 15 MB)")
     try:
@@ -63,6 +66,8 @@ def review(rid: int, doc_id: int, corrections: dict,
                 v = float(str(v).replace(",", "").replace("$", "").strip() or 0)
             except ValueError:
                 raise HTTPException(400, f"'{k}' must be a number")
+        if isinstance(v, float) and (not math.isfinite(v) or v < 0):
+            raise HTTPException(400, f"'{k}' must be a finite non-negative number")
         ex.setdefault("fields", {})[k] = {"value": v, "confidence": 1.0, "raw": "user-corrected"}
     ex["needs_review"] = False
     d.extracted = ex; d.status = "reviewed"; db.commit()
@@ -97,6 +102,10 @@ def apply_to_return(rid: int, doc_id: int,
         inc["se_income"] = (inc.get("se_income") or 0) + f.get("nonemployee_comp", 0)
     else:
         raise HTTPException(400, "Unknown document type — review and set the type first")
+    try:
+        inc = IncomeIn.model_validate(inc).model_dump()
+    except ValidationError:
+        raise HTTPException(422, "Review document values: income contains invalid amounts") from None
     r.income = inc; d.status = "applied"
     r.result_federal = {}; r.result_state = {}; r.status = "in_progress"
     db.commit()

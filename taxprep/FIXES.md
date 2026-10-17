@@ -1,6 +1,6 @@
 # TaxPrep — Audit & Fix Report (Oct 2026)
 
-**Goal of the app:** prepare TY2025 returns for international students and visa holders. It covers the residency test, Form 8843, Form 1040-NR with tax treaties, dual-status returns, and CA/NY state returns. It produces the **official agency forms, filled in**, ready to sign and mail.
+**Goal of the app:** prepare TY2025 returns for international students and visa holders. It covers the residency test, Form 8843, Form 1040-NR with tax treaties, dual-status returns, and CA/NY state returns. It produces the **official agency forms, filled in**, as draft output for verification. The application is not production-ready and must use synthetic data only until the outstanding reviews pass.
 
 ## 1. Tax-law bugs fixed (these caused wrong refunds)
 
@@ -81,7 +81,7 @@ The package also includes a cover sheet with the explanation, checklist and mail
 
 - **Supplemental forms not generated** (listed as "complete and attach yourself"):
   - Schedule A (1040 / 1040-NR)
-  - Schedules 1-A, 2, 3, D, SE, 8812
+  - Schedules 1-A, 3, D, SE, 8812
   - Forms 8949, 8863, 8959, 8960, 8833
   - CA Schedule CA
 - **California:**
@@ -92,3 +92,21 @@ The package also includes a cover sheet with the explanation, checklist and mail
 - **Dual-status:** non-wage income is assumed to be received in the resident period. The full-year-resident election (6013(g)/(h)) isn't prepared.
 - **Treaty time limits** are not enforced per country; the user is warned to confirm with Pub. 901.
 - **Other states:** only CA, NY and the no-income-tax states are supported. Other states return a clear error.
+
+
+## October 16 continuation audit
+
+93 backend checks pass; 2 OCR image checks require Tesseract. This is a development preview, not production readiness.
+
+Fixed mixed Medicare wages by applying box-1 fallback per W-2. Corrected qualifying-surviving-spouse CTC phaseout and Additional Medicare thresholds to $200,000; the NIIT QSS threshold remains $250,000. Added regression checks.
+
+The API now blocks known unsupported cases rather than returning a misleading refund: age 65+ deductions; AOTC with age below 24 (including unknown age), where support/parent eligibility is missing; Additional Medicare withholding credit; excess Social Security withholding credit; dual-status investment income needing period-specific NIIT. Blindness/spouse eligibility, treaty limits, state credits, supplemental forms and other unsupported cases still need review. These blockers are not a comprehensive tax validation system.
+
+Primary references used for this focused review:
+- https://www.irs.gov/publications/p554 (older/blind taxpayer deductions)
+- https://www.irs.gov/instructions/i1040s8 (CTC/ODC phaseout)
+- https://www.irs.gov/instructions/i8959 (Additional Medicare threshold and withholding)
+- https://www.irs.gov/instructions/i8863 (AOTC refund eligibility)
+- https://www.irs.gov/instructions/i8960 (NIIT, including dual-status)
+
+Security improvements include versioned bcrypt/SHA-256 password hashing, production configuration guards on all supported hosts, restricted CORS, no-store responses, bounded upload reads and validated OCR amounts. Pending release gates include broader authentication abuse controls, session storage, account recovery/verification, secure operations, independent tax review and actual hosted E2E.

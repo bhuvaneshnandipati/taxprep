@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
 import bcrypt
+import hashlib
+import base64
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from .config import settings
@@ -8,11 +10,18 @@ from .config import settings
 oauth2 = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 def hash_password(pw: str) -> str:
-    return bcrypt.hashpw(pw.encode()[:72], bcrypt.gensalt()).decode()
+    digest = base64.b64encode(hashlib.sha256(pw.encode()).digest())
+    return "bcrypt-sha256:" + bcrypt.hashpw(digest, bcrypt.gensalt()).decode()
 
 def verify_password(pw: str, hashed: str) -> bool:
     try:
-        return bcrypt.checkpw(pw.encode()[:72], hashed.encode())
+        if hashed.startswith("bcrypt-sha256:"):
+            digest = base64.b64encode(hashlib.sha256(pw.encode()).digest())
+            return bcrypt.checkpw(digest, hashed.removeprefix("bcrypt-sha256:").encode())
+        # Preserve existing accounts, without accepting equivalent truncated passwords.
+        if len(pw.encode()) > 72:
+            return False
+        return bcrypt.checkpw(pw.encode(), hashed.encode())
     except ValueError:
         return False
 
