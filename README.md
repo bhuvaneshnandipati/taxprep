@@ -6,12 +6,13 @@ Application source is in `taxprep/`.
 ## Use as a hosted website
 
 Visitors can use TaxPrep in a mobile or desktop browser without installing any
-software. Follow [website publishing setup](WEBSITE.md) to connect GitHub,
-Vercel, Render (native Python), and Postgres. No hosting is connected yet.
+software. Follow [website publishing setup](WEBSITE.md) for native Render hosting.
+GitHub is connected and the Render database exists; the public website deployment
+is in progress. See [the work log](WORK_LOG.md) for the latest verified status.
 
 ## Run locally
 
-Install Python 3.12 and Node.js 20 or newer (including npm). In PowerShell,
+Install Python 3.12 and Node.js 22 (including npm). In PowerShell,
 from the repository root:
 
 ```powershell
@@ -49,7 +50,7 @@ Tesseract is optional for manual entry and required for image OCR uploads.
   Additional Medicare Tax, and net investment income tax. Required supporting
   Schedule SE / Forms 8959 and 8960 remain listed as missing when applicable.
 - Makes the backend test setup work on Windows; OCR image tests require Tesseract.
-- Updates Next.js from 14.2.5 to 14.2.35 per its December 2025 security advisory.
+- Upgrades Next.js to 16.4.2 and React to 19.3.1, with a verified webpack production build.
 
 See [audit and remaining limitations](taxprep/FIXES.md) and
 [deployment instructions](taxprep/DEPLOY.md). This application currently prepares TY2025 only.
@@ -60,8 +61,9 @@ October 16, 2026: backend suite **78 passed, 2 skipped** (Tesseract-dependent im
 tests); frontend production build passed; both Schedule 2 pages rendered and inspected.
 Schedule 2 line-placement tests reopen the saved PDF and check the numeric fields.
 
-The frontend dependency audit still reports high/critical findings in the older
-Next.js dependency line. The 14.2.35 patch is not a complete remediation of later
-advisories; a framework migration remains required before treating this release
-as production-hardened. Supplemental forms other than Schedule 2 remain subject
-to the limitations in the audit report.
+The upgraded frontend production dependency audit reported zero vulnerabilities.
+The full audit still reports seven development-tool findings (five high and two
+moderate); these need separate review. Supplemental forms other than Schedule 2
+remain subject to the limitations in the audit report. Deployment and end-to-end
+checks remain pending; a clean production dependency audit alone does not establish
+that the application is ready for real taxpayer data.
