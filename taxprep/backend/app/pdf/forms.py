@@ -211,5 +211,8 @@ def build_package(taxpayer: dict, profile: dict, result: dict, year: int = 2025)
     out.insert_pdf(pymupdf.open("pdf", _cover(taxpayer, result, year, included, missing)))
     for d in parts:
         out.insert_pdf(d)
-    out.set_metadata({"title": f"Tax Return Filing Package — TY{year}", "producer": "TaxPrep"})
+    for page in out:
+        page.insert_text((10, page.rect.height - 60), "SYNTHETIC TEST PREVIEW - DO NOT FILE",
+                         fontsize=10, fontname="hebo", color=(0.8, 0, 0), rotate=90, overlay=True)
+    out.set_metadata({"title": f"SYNTHETIC TEST PREVIEW - DO NOT FILE - TY{year}", "producer": "TaxPrep"})
     return out.tobytes(garbage=3, deflate=True)

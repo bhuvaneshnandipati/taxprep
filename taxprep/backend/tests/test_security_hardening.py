@@ -84,3 +84,37 @@ def test_qss_uses_200k_credit_and_medicare_thresholds():
                 'w2s': [{'wages': 250000}]}))
     assert out['federal']['lines']['addl_medicare'] == 450
     assert out['federal']['lines']['ctc_odc'] == 0
+
+
+
+def test_applied_document_cannot_be_reopened_and_duplicated():
+    from app.db.session import SessionLocal
+    from app.db.models import Document
+    client = TestClient(app)
+    response = client.post('/auth/register', json={'email': 'document.once@example.com', 'password': 'synthetic-password'})
+    headers = {'Authorization': 'Bearer ' + response.json()['access_token']}
+    rid = client.post('/returns', headers=headers).json()['id']
+    with SessionLocal() as db:
+        doc = Document(return_id=rid, filename='synthetic.txt', doc_type='W-2', status='reviewed',
+                       extracted={'fields': {'wages': {'value': 1000}, 'employer': {'value': 'Synthetic'}}})
+        db.add(doc); db.commit(); db.refresh(doc); did = doc.id
+    url = f'/returns/{rid}/documents/{did}'
+    assert client.post(url + '/apply', headers=headers).status_code == 200
+    assert client.put(url, headers=headers, json={'wages': 2000}).status_code == 409
+    assert client.post(url + '/apply', headers=headers).status_code == 409
+    income = client.get(f'/returns/{rid}', headers=headers).json()['income']
+    assert len(income['w2s']) == 1 and income['w2s'][0]['wages'] == 1000
+
+
+
+def test_every_pdf_page_carries_synthetic_preview_mark():
+    from app.api.returns import run_calculation
+    from app.pdf.forms import build_package
+    from types import SimpleNamespace
+    import pymupdf
+    row = SimpleNamespace(profile={'citizen': True}, tax_year=2025,
+                          income={'state': 'TX', 'w2s': [{'wages': 45000}]})
+    result = run_calculation(row)
+    doc = pymupdf.open('pdf', build_package({'first_name': 'Synthetic', 'last_name': 'Example'}, row.profile, result))
+    assert 'DO NOT FILE' in doc.metadata['title']
+    assert all('SYNTHETIC TEST PREVIEW - DO NOT FILE' in page.get_text() for page in doc)

@@ -96,7 +96,7 @@ The package also includes a cover sheet with the explanation, checklist and mail
 
 ## October 16 continuation audit
 
-93 backend checks pass; 2 OCR image checks require Tesseract. This is a development preview, not production readiness.
+95 backend checks pass; 2 OCR image checks require Tesseract. This is a development preview, not production readiness.
 
 Fixed mixed Medicare wages by applying box-1 fallback per W-2. Corrected qualifying-surviving-spouse CTC phaseout and Additional Medicare thresholds to $200,000; the NIIT QSS threshold remains $250,000. Added regression checks.
 

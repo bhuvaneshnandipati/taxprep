@@ -54,6 +54,8 @@ def review(rid: int, doc_id: int, corrections: dict,
     d = db.query(Document).filter_by(id=doc_id, return_id=r.id).first()
     if not d:
         raise HTTPException(404, "Document not found")
+    if d.status == "applied":
+        raise HTTPException(409, "Applied documents cannot be edited; change income directly instead")
     ex = dict(d.extracted)
     doc_type = corrections.pop("doc_type", None)
     if doc_type is not None:

@@ -22,7 +22,7 @@ Existing Vercel Hobby frontend: https://taxprep-mu.vercel.app. Latest observed d
 
 ## Verification
 
-93 backend checks passed; 2 Tesseract image checks skipped. Production frontend build passed. Local browser journey: synthetic account -> new 2025 return -> synthetic name -> citizen residency -> income $45,000, withholding $4,200 federal/$1,400 CA, age 30 -> $925 federal / $617 CA refunds -> PDF download -> sign-out/sign-in -> saved results resumed. No real taxpayer information was used. API/PDF tests cover additional scenarios, not every tax situation.
+95 backend checks passed; 2 Tesseract image checks skipped. Production frontend build passed. Local browser journey: synthetic account -> new 2025 return -> synthetic name -> citizen residency -> income $45,000, withholding $4,200 federal/$1,400 CA, age 30 -> $925 federal / $617 CA refunds -> PDF download -> sign-out/sign-in -> saved results resumed. No real taxpayer information was used. API/PDF tests cover additional scenarios, not every tax situation.
 
 ## Genuine blocker
 

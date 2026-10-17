@@ -54,6 +54,6 @@ See [audit and remaining limitations](taxprep/FIXES.md) and
 
 ## Validation and remaining work
 
-October 16, 2026: 93 backend checks passed; 2 image-OCR checks skipped without Tesseract. The suite covers engine examples, API authorization, encrypted identifiers, PDF field mapping, and new production-configuration/password/finite-money protections. Frontend production build passed. A local browser E2E using synthetic data verified registration, profile/residency, calculation, PDF download, sign-out/sign-in, and saved-return resume. The $45,000 single-citizen sample produced $925 federal and $617 CA refunds.
+October 16, 2026: 95 backend checks passed; 2 image-OCR checks skipped without Tesseract. The suite covers engine examples, API authorization, encrypted identifiers, PDF field mapping, and new production-configuration/password/finite-money protections. Frontend production build passed. A local browser E2E using synthetic data verified registration, profile/residency, calculation, PDF download, sign-out/sign-in, and saved-return resume. The $45,000 single-citizen sample produced $925 federal and $617 CA refunds.
 
 Hosted E2E, independent full tax correctness, broader security review and production readiness remain unverified. See [remaining limitations](taxprep/FIXES.md). Generated PDFs are marked as synthetic test previews, not filing-ready returns.
