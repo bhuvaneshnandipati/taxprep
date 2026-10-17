@@ -7,7 +7,7 @@ bcrypt
 python-jose[cryptography]
 python-multipart
 reportlab
-psycopg2-binary
+psycopg[binary]>=3.2
 pytesseract
 pillow
 pillow-heif
