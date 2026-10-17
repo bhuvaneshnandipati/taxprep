@@ -504,25 +504,11 @@ export default function ReturnWizard() {
       <button className="btn w-full sm:w-auto mb-2" disabled={busy} onClick={async () => {
         setBusy(true); setErr("");
         try { await downloadPackage(rid, TAX_YEAR); } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
-      }}>{busy ? "Preparing…" : "Download filing package (PDF)"}</button>
-      <p className="text-xs text-gray-500 mb-8">Draft official forms for synthetic testing. Do not sign or file this preview; tax coverage and correctness review remain incomplete.</p>
+      }}>{busy ? "Preparing…" : "Download synthetic preview PDF"}</button>
+      <p className="text-xs text-gray-500 mb-8">These are unreviewed test estimates. The PDF contains draft forms for synthetic testing only. Do not sign or file it.</p>
       <h3 className="font-bold mb-2">How your tax was calculated</h3>
       <div className="card mb-6 space-y-2">
         {[...F!.explanations, ...C!.explanations].map((e, i) => <p key={i} className="text-sm text-gray-600">• {e}</p>)}
-      </div>
-      <h3 className="font-bold mb-2">Filing checklist</h3>
-      <div className="card mb-6">
-        {result.checklist.map((c, i) => (
-          <div key={i} className="flex gap-2.5 py-2 border-b border-dotted border-rule last:border-0 text-sm">
-            <span className="font-mono text-formblue">☐</span>{c}
-          </div>
-        ))}
-      </div>
-      <h3 className="font-bold mb-2">Where to mail</h3>
-      <div className="card text-sm space-y-2">
-        {result.mailing?.federal && <p><b>Federal:</b> {result.mailing.federal}</p>}
-        {result.mailing?.state && <p><b>{C!.state}:</b> {result.mailing.state}</p>}
-        <p className="text-gray-500">Deadline: April 15, 2026 (June 15, 2026 for nonresident aliens with no wages subject to withholding). Form 8843 alone is due June 15, 2026.</p>
       </div>
     </>
   );

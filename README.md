@@ -5,7 +5,7 @@ Application source is in `taxprep/`.
 
 ## Use as a hosted website
 
-An existing frontend is at https://taxprep-mu.vercel.app. Its hosted backend and database are not yet verified. Use synthetic test data only. [Website setup](WEBSITE.md) documents the free Vercel + Neon personal-preview route and the pending Neon authorization. Render is excluded.
+The synthetic-data preview is at https://taxprep-mu.vercel.app, with a separate hosted API and Neon database. Use synthetic test data only. [Website status and limits](WEBSITE.md) document the free Vercel + Neon route. Render is excluded.
 
 ## Run locally
 
@@ -34,9 +34,9 @@ Tesseract is optional for manual entry and required for image OCR uploads.
 5. Answer the interview and enter income, withholding, deductions, and state details.
    If uploading documents, review the extracted values before applying them.
 6. Select **Calculate my return** and review the results and warnings.
-7. Select **Download filing package (PDF)**. Review its checklist and any attachments
-   marked as not generated. Sign and follow the filing instructions after completing
-   those missing attachments. The application does not e-file.
+7. Select **Download filing package (PDF)** to review the synthetic preview output
+   and its checklist. Some supporting attachments may not be generated. The
+   application does not e-file; its output is not ready for filing.
 8. Reopen a saved return from the dashboard to continue. After editing income,
    calculate again and download a fresh package.
 
@@ -56,4 +56,4 @@ See [audit and remaining limitations](taxprep/FIXES.md) and
 
 October 16, 2026: 95 backend checks passed; 2 image-OCR checks skipped without Tesseract. The suite covers engine examples, API authorization, encrypted identifiers, PDF field mapping, and new production-configuration/password/finite-money protections. Frontend production build passed. A local browser E2E using synthetic data verified registration, profile/residency, calculation, PDF download, sign-out/sign-in, and saved-return resume. The $45,000 single-citizen sample produced $925 federal and $617 CA refunds.
 
-Hosted E2E, independent full tax correctness, broader security review and production readiness remain unverified. See [remaining limitations](taxprep/FIXES.md). Generated PDFs are marked as synthetic test previews, not filing-ready returns.
+The hosted API passed synthetic checks for registration, account isolation, save/resume, calculation, and PDF download. Independent full tax correctness, broader security review, and production readiness remain unverified. See [remaining limitations](taxprep/FIXES.md). Generated PDFs are marked as synthetic test previews, not filing-ready returns.

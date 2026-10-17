@@ -1,35 +1,28 @@
-# TaxPrep website publishing
+# TaxPrep hosted preview
 
-Status, October 16, 2026 (America/Los_Angeles): an existing Vercel Hobby frontend was recovered at https://taxprep-mu.vercel.app. This is not a verified working hosted tax application. The backend and persistent database are not connected or deployed by this session. Only synthetic test data is permitted.
+Status, October 17, 2026 (America/Los_Angeles): the separate Vercel Hobby frontend and FastAPI backend are connected to a Neon Free PostgreSQL database. This is a **synthetic-data preview only**, not a filing-ready or production tax service.
 
-## Selected free route
+## Addresses and services
 
-Use the existing Vercel Hobby account and frontend project, a second Vercel FastAPI project, and Neon Free PostgreSQL. No Render resources are used by this plan. No paid tier, card, new provider grant, or new service has been created.
+- Frontend: https://taxprep-mu.vercel.app (`taxprep`, root `taxprep/frontend`)
+- API: https://taxprep-api.vercel.app (`taxprep-api`, root `taxprep/backend`)
+- Database: Neon Free project `taxprep-2025-preview` in AWS US East 2. It holds only synthetic test accounts and returns from this work.
+- Source: https://github.com/bhuvaneshnandipati/taxprep
 
-Verified provider documentation:
-- https://vercel.com/docs/frameworks/backend/fastapi supports app/main.py and Python serverless deployment.
-- https://vercel.com/docs/plans/hobby is free for personal, non-commercial use, with usage caps that can pause service. This route is for a personal test preview, not a commercial tax-preparation business.
-- https://neon.com/pricing explicitly offers Free without a credit card or time limit; quota and backup limits still apply.
+No Render service is used. These are separate from the portfolio website. Vercel Hobby is for personal, non-commercial use and has usage limits; Neon Free also has quota and backup limits.
 
-## Necessary account intervention
+## Configuration
 
-Neon sign-in via GitHub stops at **Authorize Neon Console**, requesting read-only access to GitHub email addresses. New access requires user confirmation. Any subsequent account-creation terms must also be completed/accepted by the user. Do not authorize or accept on their behalf without the required confirmation.
+The backend has private `DATABASE_URL`, `JWT_SECRET`, and `DATA_KEY` values, plus `PRODUCTION=1`, `DB_SSLMODE=require`, and exact `CORS_ORIGINS=https://taxprep-mu.vercel.app`. Never put private values in frontend variables or source control. Its hosted rules are read-only; reviewed rule changes require a commit and redeployment.
 
-## Deployment settings prepared
+The frontend has public Config variables `NEXT_PUBLIC_API_URL=https://taxprep-api.vercel.app` and `NEXT_PUBLIC_ENABLE_API=true` for Production and Preview. A frontend redeployment is needed after changing either variable.
 
-1. Reuse the existing frontend Vercel project `taxprep`, repository root `taxprep/frontend`. Build `npm run build`, Node 22, Next.js framework. GitHub pushes automatically deploy it.
-2. Create a Neon project on Free after account authorization. Use its pooled PostgreSQL connection URL with TLS. Do not reuse the expiring Render database or migrate unknown taxpayer records.
-3. Import the same GitHub repo as a separate Vercel project, proposed name `taxprep-api`, root `taxprep/backend`, detected FastAPI entrypoint `app/main.py`, Python 3.12. `vercel.json` limits execution to 60 seconds; `.vercelignore` excludes local databases and secrets.
-4. Configure backend-only environment variables: `DATABASE_URL` (pooled PostgreSQL TLS URL), `JWT_SECRET` (48 random bytes encoded URL-safe), `DATA_KEY` (valid persistent Fernet key), `PRODUCTION=1`, `DB_SSLMODE=require`, `CORS_ORIGINS=https://taxprep-mu.vercel.app`. The API refuses unsafe production configuration. Never expose secrets in a public frontend variable or source control.
-5. Set frontend `NEXT_PUBLIC_API_URL` to the observed backend HTTPS origin and rebuild. Do not guess the URL. Keep the existing projects separate from the portfolio.
-6. Rules/templates must be included in the Python function bundle. Rule editing in the hosted admin API is read-only; reviewed rule changes must be committed and redeployed. Serverless local storage is not durable. PostgreSQL persists accounts/returns.
-7. Tesseract is unavailable in this serverless plan. Manual entry remains supported. Scanned-image OCR remains unverified/unsupported; do not promise it works. Confirm provider payload limits before uploads; the app's 15 MB bound does not override a provider's smaller bound.
-8. Before sharing a working preview: verify health, CORS, synthetic registration/login, cross-account isolation, encryption at rest, create/resume/recalculate, official draft PDF download, and mobile/desktop layout against actual hosted services.
+## Verification and limits
 
-## Release gates
+Local checks passed: 95 backend tests, with two Tesseract image checks skipped, a production frontend build, and a synthetic local browser journey. Hosted API checks passed health, exact-origin CORS, registration, cross-account isolation, save/resume, calculation, and PDF download with synthetic wages of $45,000 and withholding of $4,200 federal/$1,400 California. The example produced $925 federal and $617 California refunds; these figures are test outputs, not a tax-correctness certification.
 
-The application is not production-ready. Existing federal, treaty, dual-status, CA/NY calculations and supplemental-form limitations require independent review, including changes in law. Authentication needs abuse controls, account recovery/verification and a broader security/privacy review before handling actual taxpayer data. Local tests do not establish hosted E2E or full tax correctness. PDFs and the UI explicitly identify synthetic test previews. No e-filing is supported.
+The public browser journey also passed synthetic registration, return creation and saving, and calculation. Selecting the California renter credit yielded $925 federal and $677 California refunds. The difference from the API-only state result is the $60 renter credit.
 
-Free tiers have resource limits; they do not guarantee continuous availability or eliminate maintenance.
+Scanned-image OCR is unverified on Vercel. Manual entry remains available. Provider request-size limits may be smaller than the app's upload limit. E-filing is unsupported. Authentication needs abuse controls, account recovery/verification, and a security/privacy review. Federal, treaty, dual-status, and state calculations and forms require independent review for current law and individual applicability before any real taxpayer data is used.
 
-Public API calls are disabled by default, and Render endpoints are rejected. After verifying the replacement API, set `NEXT_PUBLIC_ENABLE_API=true` together with its HTTPS `NEXT_PUBLIC_API_URL` and rebuild. Localhost development remains enabled.
+Only synthetic data may be entered or uploaded. The UI and PDFs label this preview accordingly.

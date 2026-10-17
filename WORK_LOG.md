@@ -31,3 +31,15 @@ Neon OAuth is at GitHub's **Authorize Neon Console**, asking read-only access to
 Once authorized: create Neon Free project, configure Vercel FastAPI project, set backend-only persistent secrets and exact CORS, connect frontend via NEXT_PUBLIC_API_URL, deploy, and execute hosted synthetic E2E. See WEBSITE.md for settings and release gates. Tax correctness and security reviews remain incomplete, and the app is not production-ready.
 
 Public API calls are disabled by default, and Render endpoints are rejected. After verifying the replacement API, set `NEXT_PUBLIC_ENABLE_API=true` together with its HTTPS `NEXT_PUBLIC_API_URL` and rebuild. Localhost development remains enabled.
+
+## Hosted continuation, October 16, 2026
+
+- With explicit approval for Neon's read-only GitHub email access, created Neon Free project `taxprep-2025-preview` (project ID `silent-sound-12978574`, AWS US East 2). The database contains only synthetic test accounts and returns from this continuation.
+- Created separate Vercel Hobby FastAPI project `taxprep-api` at https://taxprep-api.vercel.app with private database and application secrets. No secrets were committed.
+- Initial runtime failure exposed SQLAlchemy 2.1's move to the Psycopg 3 default. Updated the production dependency to `psycopg[binary]>=3.2` and pushed commit `fa2c038`.
+- Corrected the database URL after the browser editor introduced visual line-wrap whitespace. The deployed `/health` endpoint now returns `{"status":"ok"}`.
+- Hosted synthetic API check passed health, exact-origin CORS, registration, cross-account isolation, saved return, federal and CA calculation ($925/$617 refund for the synthetic wages example), resume, and PDF download. The script is in the task's `work/taxprep-hosted-smoke.py`, outside the repository.
+- With the user's explicit approval, replaced the old `NEXT_PUBLIC_API_URL` Secret with a public Config value pointing to `https://taxprep-api.vercel.app`; added `NEXT_PUBLIC_ENABLE_API=true` as Config. Both apply to Production and Preview. Redeployment was launched for the frontend.
+- The connected frontend deployment became Ready. A hosted browser check registered a new synthetic account, created/saved a return, and calculated the wages example: $925 federal and $677 California refunds (the browser example selected the $60 CA renter credit). This differs from the API-only $617 California example by exactly that credit.
+- The public results page still displayed filing directions and a past deadline despite its synthetic-only notice. Removed those directions and changed the PDF action to `Download synthetic preview PDF`; the frontend production build passed. This last UI change still requires deployment verification.
+- Security and tax correctness review remain incomplete. Only synthetic test data is permitted; do not treat this as a filing-ready tax service.
