@@ -29,6 +29,8 @@ def main(argv=None):
     if not data.startswith(b"%PDF"):
         log.error("%s is not a PDF", src); return 1
     py, draft = printed_year(data)
+    if forms[a.id].get("undated"):
+        py = a.year
     if py != a.year:
         log.error("%s appears to be for tax year %s, not %s", src.name, py, a.year); return 1
     if draft and not a.allow_draft:

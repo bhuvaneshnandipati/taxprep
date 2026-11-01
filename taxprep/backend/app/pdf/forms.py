@@ -197,26 +197,51 @@ def build_package(taxpayer: dict, profile: dict, result: dict, year: int = 2025)
         add(official.form_1040(year, taxpayer, fed_d, dual=(mode == "dual_status")),
             "Form 1040" + (" (Dual-Status Return)" if mode == "dual_status" else ""))
     L = fed["lines"]
+    sched = set(fed.get("schedules", []))
+    from ..engines.rules_loader import load_rules
+    R = load_rules("federal")
+    fs = fed["filing_status"]
+    # Attachment-sequence order: Sch 1 (01), 1-A, 2 (02), 3 (03), A (07), SE (17), 8863 (50), 8959 (71), 8960 (72)
     if L.get("other_income") or L.get("adjustments"):
         add(official.schedule_1(year, taxpayer, fed), "Schedule 1 (Form 1040)")
-    if "Schedule 2" in fed.get("schedules", []):
+    if L.get("sched1a_total"):
+        add(official.schedule_1a(year, taxpayer, fed, fs), "Schedule 1-A (Form 1040)")
+    if "Schedule 2" in sched:
         add(official.schedule_2(year, taxpayer, fed), "Schedule 2 (Form 1040)")
+    if "Schedule 3" in sched or L.get("education_credit") or L.get("sch3_refundable"):
+        add(official.schedule_3(year, taxpayer, fed), "Schedule 3 (Form 1040)")
+    if L.get("deduction_type") == "itemized" and L.get("deduction"):
+        if mode == "nonresident":
+            add(official.schedule_a_nr(year, taxpayer, fed), "Schedule A (Form 1040-NR)")
+        else:
+            add(official.schedule_a(year, taxpayer, fed), "Schedule A (Form 1040)")
     if mode == "nonresident":
         if L.get("nec_tax"):
             add(official.schedule_nec(year, taxpayer, fed), "Schedule NEC (Form 1040-NR)")
         add(official.schedule_oi(year, taxpayer, profile, fed, res), "Schedule OI (Form 1040-NR)")
+    if L.get("se_tax"):
+        add(official.schedule_se(year, taxpayer, fed, R["self_employment"]["ss_wage_base"]), "Schedule SE (Form 1040)")
+    if "Form 8959" in sched:
+        add(official.form_8959(year, taxpayer, fed, R["additional_medicare"]["threshold"][fs]), "Form 8959")
+    if "Form 8960" in sched:
+        add(official.form_8960(year, taxpayer, fed, R["niit"]["magi_threshold"][fs]), "Form 8960")
+    if "Form 8833" in sched:
+        add(official.form_8833(year, taxpayer, fed, result.get("_payers", "")), "Form 8833")
     if mode == "dual_status":
         doc = pymupdf.open("pdf", _dual_statement(taxpayer, dict(result, _wages_nr_period=result.get("_wages_nr_period", 0)), year))
         add(doc, "Dual-status statement")
     if res.get("form_8843_required"):
         add(official.form_8843(year, taxpayer, profile, res), "Form 8843")
+    if L.get("owed"):
+        add(official.form_1040v(year, taxpayer, L["owed"]), "Form 1040-V payment voucher (do not attach; put loose in the envelope with your check)")
 
     # schedules the engine says are needed but that are not generated here
-    generated = {"Schedule 1", "Schedule 2", "Schedule NEC (Form 1040-NR)", "Schedule OI (Form 1040-NR)",
-                 "Form 1040-NR (dual-status statement)"}
-    for s in fed.get("schedules", []):
-        if s not in generated:
-            missing.append(s)
+    generated = {"Schedule 1", "Schedule 1-A", "Schedule 2", "Schedule 3", "Schedule A", "Schedule A (Form 1040-NR)",
+                 "Schedule NEC (Form 1040-NR)", "Schedule OI (Form 1040-NR)", "Schedule SE", "Form 8959", "Form 8960",
+                 "Form 8833", "Form 1040-NR (dual-status statement)"}
+    for s_ in fed.get("schedules", []):
+        if s_ not in generated:
+            missing.append(s_)
 
     if st["form"] != "none":
         ca_in = {"dependents": result.get("_dependents", 0), "state_wages": result.get("_state_wages", 0),

@@ -65,10 +65,12 @@ def form_1040(year, tp, fed, dual=False):
         "f2_11[0]": money(L["ctc_odc"]), "f2_12[0]": money(L["education_credit"]),
         "f2_13[0]": money(L["total_credits"]), "f2_14[0]": money(L["tax_after_credits"], blank_zero=False),
         "f2_15[0]": money(L["other_taxes"]), "f2_16[0]": money(L["total_tax"], blank_zero=False),
-        "f2_17[0]": money(L["withholding_w2"]), "f2_19[0]": money(L["withholding_1042s"]),
+        "f2_17[0]": money(L["withholding_w2"]), "f2_18[0]": money(L.get("withholding_1099", 0)),
+        "f2_19[0]": money(L.get("withholding_other", L["withholding_1042s"])),
         "f2_20[0]": money(L["withholding_total"]), "f2_21[0]": money(L["estimated_payments"]),
         "f2_23[0]": money(L["eitc"]), "f2_24[0]": money(L["actc"]), "f2_25[0]": money(L["aotc_refundable"]),
-        "f2_28[0]": money(L["eitc"] + L["actc"] + L["aotc_refundable"]),
+        "f2_27[0]": money(L.get("sch3_refundable", 0)),
+        "f2_28[0]": money(L["eitc"] + L["actc"] + L["aotc_refundable"] + L.get("sch3_refundable", 0)),
         "f2_29[0]": money(L["total_payments"], blank_zero=False),
         "f2_30[0]": money(L["overpaid"]), "f2_31[0]": money(L["overpaid"]), "f2_35[0]": money(L["owed"]),
         "f2_40[0]": tp.get("occupation", ""), "f2_44[0]": tp.get("phone", ""), "f2_45[0]": tp.get("email", ""),
@@ -110,8 +112,11 @@ def form_1040nr(year, tp, fed):
         "f2_16[0]": money(L["nec_tax"]), "f2_17[0]": money(L["other_taxes"]),
         "f2_19[0]": money(L["nec_tax"] + L["other_taxes"]),
         "f2_20[0]": money(L["total_tax"], blank_zero=False),
-        "f2_21[0]": money(L["withholding_w2"]), "f2_24[0]": money(L["withholding_w2"]),
+        "f2_21[0]": money(L["withholding_w2"]), "f2_22[0]": money(L.get("withholding_1099", 0)),
+        "f2_23[0]": money(L.get("addl_medicare_withheld", 0)),
+        "f2_24[0]": money(L["withholding_w2"] + L.get("withholding_1099", 0) + L.get("addl_medicare_withheld", 0)),
         "f2_27[0]": money(L["withholding_1042s"]), "f2_28[0]": money(L["estimated_payments"]),
+        "f2_33[0]": money(L.get("sch3_refundable", 0)), "f2_34[0]": money(L.get("sch3_refundable", 0)),
         "f2_35[0]": money(L["total_payments"], blank_zero=False),
         "f2_36[0]": money(L["overpaid"]), "f2_37[0]": money(L["overpaid"]), "f2_42[0]": money(L["owed"]),
         "f2_47[0]": tp.get("occupation", ""), "f2_49[0]": tp.get("phone", ""), "f2_50[0]": tp.get("email", ""),
@@ -435,3 +440,189 @@ def ny_it203(year, tp, fed, st, ny_inputs):
     if L["overpaid"]:
         radios["line 68"] = "debit#20card"
     return fill_pdf(path, v, radios=radios)
+
+
+# ======================================================================= supplemental federal forms
+def _head(tp, ssn_fmt=digits):
+    first, last = _name(tp)
+    return " ".join(filter(None, [first, last])), ssn_fmt(tp.get("ssn", ""))
+
+
+def schedule_a(year, tp, fed):
+    """Schedule A (Form 1040), itemized deductions."""
+    L = fed["lines"]
+    name, ssn = _head(tp)
+    taxes = L["salt_deduction"]
+    gifts = L["sa_gifts"]
+    return fill_pdf(template_path(year, "f1040sa.pdf"), {
+        "f1_1[0]": name, "f1_2[0]": ssn,
+        "f1_3[0]": money(L["sa_medical_paid"]), "f1_4[0]": money(L["agi"], blank_zero=False) if L["sa_medical_paid"] else "",
+        "f1_5[0]": money(round(L["agi"] * 0.075)) if L["sa_medical_paid"] else "", "f1_6[0]": money(L["sa_medical"]),
+        "f1_7[0]": money(L["sa_state_income_tax"]), "f1_8[0]": money(L["sa_real_estate_tax"]),
+        "f1_10[0]": money(L["sa_salt_paid"]), "f1_11[0]": money(taxes), "f1_14[0]": money(taxes),
+        "f1_15[0]": money(L["sa_mortgage"]), "f1_20[0]": money(L["sa_mortgage"]), "f1_22[0]": money(L["sa_mortgage"]),
+        "f1_23[0]": money(L["sa_gifts_cash"]), "f1_24[0]": money(L["sa_gifts_noncash"]), "f1_26[0]": money(gifts),
+        "f1_28[0]": "See statement" if L["sa_other"] else "", "f1_29[0]": money(L["sa_other"]),
+        "f1_30[0]": money(L["sa_total"], blank_zero=False),
+    })
+
+
+def schedule_a_nr(year, tp, fed):
+    """Schedule A (Form 1040-NR), itemized deductions for nonresident aliens."""
+    L = fed["lines"]
+    name, ssn = _head(tp)
+    return fill_pdf(template_path(year, "f1040nra.pdf"), {
+        "f1_1[0]": name, "f1_2[0]": ssn,
+        "f1_3[0]": money(L["sa_state_income_tax"]), "f1_4[0]": money(L["salt_deduction"]),
+        "f1_5[0]": money(L["sa_gifts_cash"]), "f1_6[0]": money(L["sa_gifts_noncash"]),
+        "f1_8[0]": money(L["sa_gifts"]), "f1_12[0]": money(L["sa_total"], blank_zero=False),
+    })
+
+
+def schedule_3(year, tp, fed):
+    L = fed["lines"]
+    name, ssn = _head(tp)
+    return fill_pdf(template_path(year, "f1040s3.pdf"), {
+        "f1_01[0]": name, "f1_02[0]": ssn,
+        "f1_05[0]": money(L["education_credit"]), "f1_25[0]": money(L["education_credit"]),
+        "f1_28[0]": money(L.get("excess_ss_credit", 0)), "f1_37[0]": money(L.get("sch3_refundable", 0)),
+    })
+
+
+def form_8959(year, tp, fed, fs_threshold):
+    L = fed["lines"]
+    name, ssn = _head(tp)
+    mw, se = L.get("medicare_wages", 0), L.get("medicare_se_wages", 0)
+    p1 = max(0, mw - fs_threshold)
+    rem = max(0, fs_threshold - mw)
+    p2 = max(0, se - rem)
+    box6 = L.get("medicare_tax_withheld", 0)
+    reg = round(mw * 0.0145)
+    return fill_pdf(template_path(year, "f8959.pdf"), {
+        "f1_1[0]": name, "f1_2[0]": ssn,
+        "f1_3[0]": money(mw), "f1_6[0]": money(mw), "f1_7[0]": money(fs_threshold, blank_zero=False),
+        "f1_8[0]": money(p1), "f1_9[0]": money(round(p1 * 0.009)),
+        "f1_10[0]": money(se), "f1_11[0]": money(fs_threshold, blank_zero=False) if se else "",
+        "f1_12[0]": money(mw) if se else "", "f1_13[0]": money(rem) if se else "", "f1_14[0]": money(p2),
+        "f1_15[0]": money(round(p2 * 0.009)),
+        "f1_20[0]": money(L.get("addl_medicare", 0)),
+        "f1_21[0]": money(box6), "f1_22[0]": money(mw) if box6 else "", "f1_23[0]": money(reg) if box6 else "",
+        "f1_24[0]": money(L.get("addl_medicare_withheld", 0)), "f1_26[0]": money(L.get("addl_medicare_withheld", 0)),
+    })
+
+
+def form_8960(year, tp, fed, threshold):
+    L = fed["lines"]
+    name, ssn = _head(tp)
+    nii = L.get("net_investment_income", 0)
+    over = max(0, L["agi"] - threshold)
+    return fill_pdf(template_path(year, "f8960.pdf"), {
+        "f1_1[0]": name, "f1_2[0]": ssn,
+        "f1_3[0]": money(L["taxable_interest"]), "f1_4[0]": money(L["ordinary_dividends"]),
+        "f1_9[0]": money(max(0, L["capital_gain"])), "f1_12[0]": money(max(0, L["capital_gain"])),
+        "f1_15[0]": money(nii), "f1_22[0]": money(nii),
+        "f1_23[0]": money(L["agi"]), "f1_24[0]": money(threshold, blank_zero=False), "f1_25[0]": money(over),
+        "f1_26[0]": money(min(nii, over)), "f1_27[0]": money(L.get("niit", 0)),
+    })
+
+
+def schedule_se(year, tp, fed, ss_wage_base):
+    L = fed["lines"]
+    name, ssn = _head(tp, ssn_dashed)
+    profit = L["sched1_business"]
+    ne = L.get("se_net_earnings", 0)
+    wages = L["wages"]
+    room = max(0, ss_wage_base - wages)
+    ss_part = min(ne, room)
+    return fill_pdf(template_path(year, "f1040sse.pdf"), {
+        "f1_1[0]": name, "f1_2[0]": ssn,
+        "f1_5[0]": money(profit), "f1_6[0]": money(profit), "f1_7[0]": money(ne), "f1_9[0]": money(ne),
+        "f1_12[0]": money(ne), "f1_14[0]": money(wages), "f1_17[0]": money(wages),
+        "f1_18[0]": money(room), "f1_19[0]": money(round(ss_part * 0.124)), "f1_20[0]": money(round(ne * 0.029)),
+        "f1_21[0]": money(L["se_tax"]), "f1_22[0]": money(L["adj_half_se"]),
+    })
+
+
+def schedule_1a(year, tp, fed, fs):
+    """Schedule 1-A: tips (Part II), overtime (Part III) and seniors (Part V)."""
+    import math
+    L = fed["lines"]
+    name, ssn = _head(tp)
+    magi = L["agi"]
+    v = {"f1_01[0]": name, "f1_02[0]": ssn, "f1_03[0]": money(magi, blank_zero=False),
+         "f1_09[0]": money(magi, blank_zero=False)}
+    lim = 300000 if fs == "mfj" else 150000
+    over = max(0, magi - lim)
+    steps = math.floor(over / 1000)
+
+    def part(raw, cap, ded, f):   # f = field numbers for: input, total, capped, magi, limit, excess, steps, x100, result
+        capped = min(raw, cap)
+        v.update({f[0]: money(raw), f[1]: money(raw), f[2]: money(capped), f[3]: money(magi, blank_zero=False),
+                  f[4]: money(lim, blank_zero=False), f[5]: money(over), f[6]: str(steps) if over else "",
+                  f[7]: money(steps * 100), f[8]: money(ded)})
+    if L.get("sched1a_tips"):
+        part(L["tips_raw"], 25000, L["sched1a_tips"],
+             ["f1_12[0]", "f1_14[0]", "f1_15[0]", "f1_16[0]", "f1_17[0]", "f1_18[0]", "f1_19[0]", "f1_20[0]", "f1_21[0]"])
+    if L.get("sched1a_overtime"):
+        part(L["overtime_raw"], 25000 if fs == "mfj" else 12500, L["sched1a_overtime"],
+             ["f1_22[0]", "f1_24[0]", "f1_25[0]", "f1_26[0]", "f1_27[0]", "f1_28[0]", "f1_29[0]", "f1_30[0]", "f1_31[0]"])
+    if L.get("sched1a_senior"):
+        base = 150000 if fs == "mfj" else 75000
+        sover = max(0, magi - base)
+        each = max(0, 6000 - round(sover * 0.06))
+        v.update({"f2_15[0]": money(magi, blank_zero=False), "f2_16[0]": money(base, blank_zero=False),
+                  "f2_17[0]": money(sover), "f2_18[0]": money(round(sover * 0.06)), "f2_19[0]": money(each),
+                  "f2_20[0]": money(L["senior_self"]), "f2_21[0]": money(L["senior_spouse"]),
+                  "f2_22[0]": money(L["sched1a_senior"])})
+    v["f2_23[0]"] = money(L["sched1a_total"])
+    return fill_pdf(template_path(year, "f1040s1a.pdf"), v)
+
+
+def form_1040v(year, tp, amount):
+    first, last = _name(tp)
+    city, st, zp = _city(tp)
+    return fill_pdf(template_path(year, "f1040v.pdf"), {
+        "f1_1[0]": ssn_dashed(tp.get("ssn", "")), "f1_3[0]": money(amount, blank_zero=False),
+        "f1_5[0]": first, "f1_6[0]": last, "f1_9[0]": tp.get("address", ""), "f1_10[0]": tp.get("apt", ""),
+        "f1_11[0]": city, "f1_12[0]": st, "f1_13[0]": zp,
+        "f1_14[0]": tp.get("foreign_country", ""), "f1_15[0]": tp.get("foreign_province", ""),
+        "f1_16[0]": tp.get("foreign_postal", ""),
+    })
+
+
+def form_8833(year, tp, fed, payers: str = ""):
+    """Treaty-based return position disclosure (resident aliens using a saving-clause exception)."""
+    t = fed.get("treaty") or {}
+    L = fed["lines"]
+    first, last = _name(tp)
+    city, st, zp = _city(tp)
+    us_addr = ", ".join(filter(None, [tp.get("address", ""), tp.get("apt", ""), city, st, zp]))
+    amounts = []
+    if t.get("wage_exempt"):
+        amounts.append(f"wages ${t['wage_exempt']:,.0f}")
+    if t.get("scholarship_exempt"):
+        amounts.append(f"scholarship/fellowship ${t['scholarship_exempt']:,.0f}")
+    expl = (f"The taxpayer is a resident of {t.get('country', '')} who came to the United States as a student "
+            f"and became a U.S. resident alien under the substantial presence test. Under {t.get('articles', '')} of the "
+            f"U.S.-{t.get('country', '')} income tax treaty, which is an exception to the saving clause, the following "
+            f"income is exempt from U.S. tax: {', '.join(amounts) or 'see return'}. Total exempt amount "
+            f"${L.get('treaty_exempt_income', 0):,.0f}.")
+    v = {"f1_1[0]": " ".join(filter(None, [first, last])), "f1_2[0]": ssn_dashed(tp.get("ssn", "")),
+         "f1_4[0]": tp.get("foreign_country", ""), "f1_5[0]": us_addr,
+         "f1_6[0]": t.get("country", ""), "f1_7[0]": t.get("articles", ""),
+         "f1_8[0]": "IRC sections 61 and 871 (inclusion of the income in gross income)",
+         "f1_9[0]": payers[:120], "f1_10[0]": "Not applicable"}
+    for i, line in enumerate(_chunks(expl, 105)[:24]):
+        v[f"f1_{13 + i}[0]"] = line
+    return fill_pdf(template_path(year, "f8833.pdf"), v,
+                    radios={"c1_1[0]": "1", "c1_3[0]": "1", "c1_4[0]": "Off", "c1_4[1]": "2"})
+
+
+def _chunks(text, n):
+    out, line = [], ""
+    for w in text.split():
+        if len(line) + len(w) + 1 > n:
+            out.append(line); line = w
+        else:
+            line = (line + " " + w).strip()
+    return out + ([line] if line else [])

@@ -159,27 +159,42 @@ def run_calculation(r: TaxReturn) -> dict:
     p = r.profile or {}
     inc = IncomeIn(**(r.income or {})).model_dump()
     res = residency_for(p, r.tax_year)
-    if res.status == "dual_status" and any(inc[k] for k in ("interest", "dividends", "capital_gain_lt", "capital_gain_st")):
-        raise ValueError("Dual-status investment income requires period-specific NIIT calculations not supported here.")
     w2s = inc["w2s"]
     state = (inc.get("state") or "CA").upper()
     state_wh = sum(w["state_withholding"] for w in w2s if (w.get("state") or state).upper() == state)
     all_state_tax = sum(w["state_withholding"] for w in w2s) + inc["state_tax_other"]
     med = [w["medicare_wages"] if w["medicare_wages"] is not None else w["wages"] for w in w2s]
-    # Fail closed for known unsupported credits/deductions rather than return a wrong refund.
-    if inc["age"] >= 65:
-        raise ValueError("Age 65+ deductions are not supported in this preview; calculation is blocked.")
+    R = load_rules("federal")
+    # Fail closed for the cases that are still not supported, rather than return a wrong refund.
     if inc["education_credit_type"] == "aotc" and inc["tuition_paid"] and inc["age"] < 24:
-        raise ValueError("AOTC eligibility under age 24 requires additional support/parent information not supported here.")
-    if any(w["medicare_tax"] > med[i] * 0.0145 + 1 for i, w in enumerate(w2s)):
-        raise ValueError("Additional Medicare withholding credit is not supported; calculation is blocked.")
-    if sum(w["ss_tax"] for w in w2s) > 176100 * 0.062 + 1:
-        raise ValueError("Excess Social Security withholding credit is not supported; calculation is blocked.")
+        raise ValueError("AOTC for a student under 24 depends on support and parent details that are not "
+                         "collected here. Choose the Lifetime Learning Credit or leave the education credit out.")
+    if res.status == "dual_status" and any(inc[k] for k in ("interest", "dividends", "capital_gain_lt", "capital_gain_st")) \
+            and sum(w["wages"] for w in w2s) + inc["interest"] + inc["dividends"] > R["niit"]["magi_threshold"].get(inc["filing_status"], 200000):
+        raise ValueError("Dual-status investment income above the Net Investment Income Tax threshold needs a "
+                         "period-by-period NIIT calculation that is not supported here.")
+    if res.status == "nonresident" and inc["age"] >= 65:
+        raise ValueError("Age 65+ rules for nonresident aliens are not supported here.")
+    # Excess Social Security withholding: only when two or more employers together withheld more than
+    # the maximum; one employer over-withholding must refund it themselves (Form 1040 instructions).
+    max_ss = R.get("max_ss_withholding", 10918.20)
+    by_employer = {}
+    for w in w2s:
+        key = (w.get("ein") or w.get("employer") or str(id(w))).strip().lower()
+        by_employer[key] = by_employer.get(key, 0.0) + w["ss_tax"]
+    if any(v > max_ss + 0.5 for v in by_employer.values()):
+        raise ValueError("One employer withheld more Social Security tax than the 2025 maximum "
+                         f"(${max_ss:,.2f}). Ask that employer to refund the excess; it cannot be claimed on the return.")
+    excess_ss = round(max(0.0, sum(by_employer.values()) - max_ss), 2) if len(by_employer) > 1 else 0.0
     fin = FederalInput(
         filing_status=inc["filing_status"],
         wages=sum(w["wages"] for w in w2s),
         medicare_wages=sum(med),
-        fed_withholding=sum(w["fed_withholding"] for w in w2s) + inc["withholding_1099"],
+        fed_withholding=sum(w["fed_withholding"] for w in w2s), withholding_1099=inc["withholding_1099"],
+        medicare_tax_withheld=sum(w["medicare_tax"] for w in w2s), excess_ss_credit=excess_ss,
+        medical_expenses=inc["medical_expenses"], real_estate_tax=inc["real_estate_tax"],
+        mortgage_interest=inc["mortgage_interest"], charitable_noncash=inc["charitable_noncash"],
+        spouse_age=inc["spouse_age"],
         wages_nr_period=inc["wages_nr_period"],
         comp_1042s=inc["comp_1042s"], scholarship_1042s=inc["scholarship_1042s"],
         withholding_1042s=inc["withholding_1042s"],
@@ -226,7 +241,8 @@ def run_calculation(r: TaxReturn) -> dict:
             "checklist": checklist, "mailing": mailing,
             "_dependents": inc["qualifying_children"] + inc["other_dependents"],
             "_state_wages": sum(w["state_wages"] or w["wages"] for w in w2s if (w.get("state") or state).upper() == state),
-            "_state_std": std, "_wages_nr_period": inc["wages_nr_period"]}
+            "_state_std": std, "_wages_nr_period": inc["wages_nr_period"],
+            "_payers": "; ".join(dict.fromkeys(w["employer"] for w in w2s if w.get("employer")))}
 
 
 @router.post("/{rid}/calculate")

@@ -73,6 +73,17 @@ schedule_1a:
   phaseout_per_1000: 100
   mfs_allowed: false
   ssn_required: true
+  # Part V enhanced deduction for seniors (2025 Schedule 1-A lines 31-37): $6,000 per person born
+  # before Jan 2, 1961 with a valid SSN, reduced by 6% of MAGI over $75,000 ($150,000 MFJ). MFJ required if married.
+  senior:
+    amount: 6000
+    phaseout_magi: { single: 75000, mfj: 150000, hoh: 75000, qss: 75000 }
+    phaseout_rate: 0.06
+    born_before: "1961-01-02"
+
+# Social Security tax withheld above this (6.2% x $176,100 wage base) by two or more employers is
+# refundable on Schedule 3, line 11 (2025 Form 1040 instructions).
+max_ss_withholding: 10918.20
 
 se_minimum_net_earnings: 400
 

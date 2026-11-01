@@ -96,7 +96,10 @@ class FederalInput:
     # W-2 (sums across all W-2s)
     wages: float = 0.0                    # box 1
     medicare_wages: float | None = None   # box 5 (defaults to box 1)
-    fed_withholding: float = 0.0          # box 2 (+ 1099 box 4 withholding)
+    fed_withholding: float = 0.0          # W-2 box 2 (Form 1040 line 25a)
+    withholding_1099: float = 0.0         # 1099 box 4 (line 25b)
+    medicare_tax_withheld: float = 0.0    # W-2 box 6 total (Form 8959 Part V)
+    excess_ss_credit: float = 0.0         # Schedule 3 line 11 (computed from W-2 box 4 by employer)
     wages_nr_period: float = 0.0          # dual-status: part of box 1 earned before residency start
     # Form 1042-S
     comp_1042s: float = 0.0               # treaty-exempt compensation reported on 1042-S (codes 17-20)
@@ -116,7 +119,12 @@ class FederalInput:
     itemized: float = 0.0                 # legacy: total itemized deductions already computed
     state_income_tax_paid: float = 0.0    # Schedule A line 5a (state withholding + payments)
     charitable: float = 0.0
-    other_itemized: float = 0.0           # mortgage interest etc. (residents)
+    other_itemized: float = 0.0           # Schedule A line 16 "other" items from the instructions' list
+    medical_expenses: float = 0.0         # Schedule A line 1 (before the 7.5% of AGI floor)
+    real_estate_tax: float = 0.0          # Schedule A line 5b
+    mortgage_interest: float = 0.0        # Schedule A line 8a (Form 1098)
+    charitable_noncash: float = 0.0       # Schedule A line 12
+    spouse_age: int = 0                   # MFJ only; 0 = unknown
     qualified_tips: float = 0.0           # Schedule 1-A
     qualified_overtime: float = 0.0       # Schedule 1-A (FLSA premium portion only)
     has_ssn: bool = True
@@ -281,17 +289,26 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
 
     # ---------------- deductions -----------------------------------------------------------
     std = R["standard_deduction"][fs]
+    seniors = int(inp.age >= 65) + int(fs == "mfj" and inp.spouse_age >= 65)
+    if seniors and mode == "resident":
+        add = R["additional_std_deduction_65_blind"][fs] * seniors
+        std += add
+        ex.append(f"Standard deduction includes ${add:,.0f} for age 65 or older.")
     salt_cfg = R["salt_cap"]
     salt_cap = salt_cfg["cap"][fs]
     over = max(0.0, agi - salt_cfg["phase_down_magi"][fs])
     salt_cap = max(salt_cfg["floor"][fs], salt_cap - over * salt_cfg["phase_down_rate"])
-    salt = min(inp.state_income_tax_paid, salt_cap)
-    if is_nra or mode == "dual_status":
-        item = salt + inp.charitable + (inp.other_itemized if mode == "dual_status" else 0.0)
+    salt_paid = inp.state_income_tax_paid + (0.0 if is_nra else inp.real_estate_tax)
+    salt = min(salt_paid, salt_cap)
+    gifts = inp.charitable + inp.charitable_noncash
+    medical = 0.0 if is_nra else max(0.0, inp.medical_expenses - rnd(agi * 0.075))
+    mortgage = 0.0 if is_nra else inp.mortgage_interest
+    if is_nra:
+        item = salt + gifts                                   # Schedule A (Form 1040-NR)
     else:
-        item = salt + inp.charitable + inp.other_itemized
+        item = medical + salt + mortgage + gifts + inp.other_itemized
     item = max(item, inp.itemized)
-    if (item or inp.state_income_tax_paid) and inp.state_income_tax_paid > salt_cap:
+    if salt_paid > salt_cap:
         ex.append(f"State and local tax deduction capped at ${salt_cap:,.0f}.")
 
     if mode == "resident":
@@ -321,13 +338,31 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
             ex.append("Tips/overtime deductions require a Social Security number valid for employment.")
         else:
             jt = fs == "mfj"
-            red = max(0, math.ceil(max(0.0, agi - s1a["phaseout_magi"][fs]) / 1000)) * s1a["phaseout_per_1000"]
+            # Schedule 1-A lines 10-12: excess MAGI / $1,000 rounded DOWN, times $100
+            red = math.floor(max(0.0, agi - s1a["phaseout_magi"][fs]) / 1000) * s1a["phaseout_per_1000"]
             tips_ded = max(0.0, min(inp.qualified_tips, s1a["tips"]["cap_mfj" if jt else "cap"]) - red)
             ot_ded = max(0.0, min(inp.qualified_overtime, s1a["overtime"]["cap_mfj" if jt else "cap"]) - red)
             if tips_ded or ot_ded:
                 sched.append("Schedule 1-A")
                 ex.append(f"Schedule 1-A: qualified tips ${tips_ded:,.0f}, qualified overtime ${ot_ded:,.0f} deducted.")
-    s1a_total = tips_ded + ot_ded
+    senior_ded = senior_self = senior_spouse = 0.0
+    sr = s1a.get("senior")
+    if sr and (inp.age >= 65 or (fs == "mfj" and inp.spouse_age >= 65)):
+        if is_nra:
+            ex.append("Enhanced deduction for seniors is not computed for nonresident aliens.")
+        elif fs == "mfs":
+            ex.append("Enhanced deduction for seniors requires filing jointly if married.")
+        elif not inp.has_ssn:
+            ex.append("Enhanced deduction for seniors requires a valid Social Security number.")
+        else:
+            each = max(0.0, sr["amount"] - max(0.0, agi - sr["phaseout_magi"][fs]) * sr["phaseout_rate"])
+            senior_self = rnd(each) if inp.age >= 65 else 0.0
+            senior_spouse = rnd(each) if (fs == "mfj" and inp.spouse_age >= 65) else 0.0
+            senior_ded = senior_self + senior_spouse
+            if senior_ded:
+                sched.append("Schedule 1-A")
+                ex.append(f"Schedule 1-A enhanced deduction for seniors: ${senior_ded:,.0f}.")
+    s1a_total = tips_ded + ot_ded + senior_ded
 
     taxable = max(0.0, agi - deduction - s1a_total)
 
@@ -441,12 +476,26 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
     if se_tax:
         sched.append("Schedule 2")
 
+    # Form 8959 Part V: Medicare tax withheld above the regular 1.45% is Additional Medicare Tax withholding
+    addl_med_wh = max(0.0, inp.medicare_tax_withheld - rnd(med_wages * 0.0145)) if inp.medicare_tax_withheld else 0.0
+    if addl_med_wh >= 1:
+        sched += ["Form 8959", "Schedule 2"] if addl_med else ["Form 8959"]
+        ex.append(f"Additional Medicare Tax withheld by your employer (Form 8959 line 24): ${addl_med_wh:,.0f}.")
+    else:
+        addl_med_wh = 0.0
+    if inp.excess_ss_credit:
+        sched.append("Schedule 3")
+        ex.append(f"Excess Social Security tax withheld by two or more employers (Schedule 3 line 11): "
+                  f"${inp.excess_ss_credit:,.0f}.")
+
     total_credits = ctc + odc + edu_nonref
     tax_after = max(0.0, tax - total_credits)
     other_taxes = se_tax + addl_med + niit
     total_tax = tax_after + other_taxes + nec_tax
-    wh_total = inp.fed_withholding + inp.withholding_1042s
-    payments = wh_total + inp.estimated_payments + eitc + actc + edu_ref
+    wh_other = inp.withholding_1042s + addl_med_wh            # 1040 line 25c
+    wh_total = inp.fed_withholding + inp.withholding_1099 + wh_other
+    sch3_refundable = inp.excess_ss_credit                     # Schedule 3 line 15 -> 1040 line 31
+    payments = wh_total + inp.estimated_payments + eitc + actc + edu_ref + sch3_refundable
     refund = payments - total_tax
 
     r = rnd
@@ -459,6 +508,19 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
         "total_income": r(total_income), "adj_half_se": r(se_ded), "adj_student_loan": r(sl_ded),
         "adjustments": r(adjustments), "agi": r(agi), "deduction": r(deduction),
         "deduction_type": ded_type, "salt_deduction": r(salt), "charitable": r(inp.charitable),
+        "sa_medical_paid": r(0.0 if is_nra else inp.medical_expenses), "sa_medical": r(medical),
+        "sa_state_income_tax": r(inp.state_income_tax_paid), "sa_real_estate_tax": r(0.0 if is_nra else inp.real_estate_tax),
+        "sa_salt_paid": r(salt_paid), "sa_mortgage": r(mortgage), "sa_gifts_cash": r(inp.charitable),
+        "sa_gifts_noncash": r(inp.charitable_noncash), "sa_gifts": r(gifts), "sa_other": r(0.0 if is_nra else inp.other_itemized),
+        "sa_total": r(item), "sched1a_senior": r(senior_ded),
+        "senior_self": r(senior_self), "senior_spouse": r(senior_spouse),
+        "tips_raw": r(inp.qualified_tips), "overtime_raw": r(inp.qualified_overtime), "medicare_wages": r(med_wages),
+        "medicare_tax_withheld": r(inp.medicare_tax_withheld), "addl_medicare_withheld": r(addl_med_wh),
+        "withholding_1099": r(inp.withholding_1099), "withholding_other": r(wh_other),
+        "excess_ss_credit": r(inp.excess_ss_credit), "sch3_refundable": r(sch3_refundable),
+        "magi": r(agi), "net_investment_income": r(inp.interest + inp.dividends + max(0.0, net_cg)) if not is_nra else 0.0,
+        "capital_gain_st": r(st), "capital_gain_lt": r(lt), "se_net_earnings": r(se * R["self_employment"]["net_earnings_factor"]) if se_tax else 0.0,
+        "medicare_se_wages": r(med_se),
         "sched1a_tips": r(tips_ded), "sched1a_overtime": r(ot_ded), "sched1a_total": r(s1a_total),
         "total_deductions": r(deduction + s1a_total), "taxable_income": r(taxable), "tax": r(tax),
         "ctc_odc": r(ctc + odc), "education_credit": r(edu_nonref), "other_credits": r(edu_nonref),

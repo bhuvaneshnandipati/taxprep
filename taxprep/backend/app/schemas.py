@@ -89,12 +89,17 @@ class IncomeIn(BaseModel):
     student_loan_interest: Money = NonNeg
     itemized: Money = NonNeg                 # legacy total itemized override
     state_tax_other: Money = NonNeg          # state income tax paid besides W-2 box 17
-    charitable: Money = NonNeg
-    other_itemized: Money = NonNeg
+    charitable: Money = NonNeg               # Schedule A line 11 (cash/check)
+    charitable_noncash: Money = NonNeg       # Schedule A line 12
+    medical_expenses: Money = NonNeg         # Schedule A line 1 (unreimbursed)
+    real_estate_tax: Money = NonNeg          # Schedule A line 5b
+    mortgage_interest: Money = NonNeg        # Schedule A line 8a (Form 1098 box 1)
+    other_itemized: Money = NonNeg           # Schedule A line 16 (only items listed in the instructions)
     qualified_tips: Money = NonNeg
     qualified_overtime: Money = NonNeg
     has_ssn: bool = True
     age: int = Field(default=0, ge=0, le=120)
+    spouse_age: int = Field(default=0, ge=0, le=120)   # married filing jointly
     # credits
     tuition_paid: Money = NonNeg
     education_credit_type: Literal["none", "aotc", "llc"] = "none"
