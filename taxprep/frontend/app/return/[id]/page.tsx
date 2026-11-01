@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiJson, downloadPackage, uploadDocument } from "@/lib/api";
+import { BrokerTotals, BusinessEditor, DependentsEditor, ForeignAccounts, PayersEditor,
+  type Business, type Dependent, type Payer } from "@/components/Details";
 import Ledger, { CalcResult, Residency, GREEN, RED } from "@/components/Ledger";
 import { MoneyInput, YesNo, Field, TextInput } from "@/components/Fields";
 
@@ -42,6 +44,11 @@ const blankIncome = {
   tuition_paid: 0, education_credit_type: "none", qualifying_children: 0, other_dependents: 0,
   estimated_payments: 0, state: "CA", ca_full_year_resident: true, ca_income_ratio: 1,
   state_source_income: null as number | null, state_itemized: 0, ca_renter: false,
+  spouse_age: 0, medical_expenses: 0, real_estate_tax: 0, mortgage_interest: 0, charitable_noncash: 0,
+  dependents: [] as Dependent[], interest_payers: [] as Payer[], dividend_payers: [] as Payer[],
+  foreign_accounts: false, fbar_required: false, foreign_account_countries: "", foreign_trust: false,
+  st_proceeds: 0, st_basis: 0, lt_proceeds: 0, lt_basis: 0, st_loss_carryover: 0, lt_loss_carryover: 0,
+  business: null as Business | null,
 };
 
 export default function ReturnWizard() {
@@ -440,20 +447,30 @@ export default function ReturnWizard() {
             <Field label="Qualified overtime premium (the extra 0.5x only)"><MoneyInput value={inc.qualified_overtime} onChange={(v) => setI({ qualified_overtime: v })} /></Field>
           </>)}
         {(yes("has_interest") || inc.interest > 0) && (
-          <Field label="Interest income (1099-INT box 1)" hint={isNRA ? "Not taxable federally for nonresident aliens, but taxable for state residents." : undefined}>
-            <MoneyInput value={inc.interest} onChange={(v) => setI({ interest: v })} /></Field>)}
+          <>
+          {inc.interest_payers.length === 0 && <Field label="Interest income (1099-INT box 1)" hint={isNRA ? "Not taxable federally for nonresident aliens, but taxable for state residents." : "Or list each payer below (needed on Schedule B when the total is over $1,500)."}>
+            <MoneyInput value={inc.interest} onChange={(v) => setI({ interest: v })} /></Field>}
+          {!isNRA && <PayersEditor title="Interest by payer (Schedule B Part I)" hint="One line per Form 1099-INT. When listed, the total replaces the amount above." max={14}
+            value={inc.interest_payers} onChange={(v) => setI({ interest_payers: v })} />}
+          </>)}
         {(yes("has_dividends") || inc.dividends > 0) && (
           <>
-            <Field label="Ordinary dividends (1099-DIV 1a / 1042-S code 06)"><MoneyInput value={inc.dividends} onChange={(v) => setI({ dividends: v })} /></Field>
+            {inc.dividend_payers.length === 0 && <Field label="Ordinary dividends (1099-DIV 1a / 1042-S code 06)"><MoneyInput value={inc.dividends} onChange={(v) => setI({ dividends: v })} /></Field>}
+            {!isNRA && <PayersEditor title="Dividends by payer (Schedule B Part II)" hint="One line per Form 1099-DIV (box 1a). When listed, the total replaces the amount above." max={15}
+              value={inc.dividend_payers} onChange={(v) => setI({ dividend_payers: v })} />}
             {!isNRA && <Field label="Qualified dividends (1099-DIV 1b)"><MoneyInput value={inc.qualified_dividends} onChange={(v) => setI({ qualified_dividends: v })} /></Field>}
           </>)}
         {(yes("has_capital_gains") || inc.capital_gain_lt !== 0 || inc.capital_gain_st !== 0) && (
           <>
-            <Field label="Net short-term gain or (loss)" hint="Held 1 year or less. Use a minus sign for a loss."><MoneyInput allowNegative value={inc.capital_gain_st} onChange={(v) => setI({ capital_gain_st: v })} /></Field>
-            <Field label="Net long-term gain or (loss)"><MoneyInput allowNegative value={inc.capital_gain_lt} onChange={(v) => setI({ capital_gain_lt: v })} /></Field>
+            {!isNRA && <BrokerTotals inc={inc} setI={setI} />}
+            <Field label={isNRA ? "Net short-term gain or (loss)" : "Other net short-term gain or (loss)"} hint={isNRA ? "Held 1 year or less. Use a minus sign for a loss." : "Only gains not included in the 1099-B totals above."}><MoneyInput allowNegative value={inc.capital_gain_st} onChange={(v) => setI({ capital_gain_st: v })} /></Field>
+            <Field label={isNRA ? "Net long-term gain or (loss)" : "Other net long-term gain or (loss)"}><MoneyInput allowNegative value={inc.capital_gain_lt} onChange={(v) => setI({ capital_gain_lt: v })} /></Field>
           </>)}
         {(yes("has_self_employment") || inc.se_income !== 0) && (
-          <Field label="Self-employment net profit (after expenses)"><MoneyInput allowNegative value={inc.se_income} onChange={(v) => setI({ se_income: v })} /></Field>)}
+          <>
+            <BusinessEditor value={inc.business} onChange={(v) => setI({ business: v })} />
+            {!inc.business && inc.se_income !== 0 && <Field label="Self-employment net profit (after expenses)"><MoneyInput allowNegative value={inc.se_income} onChange={(v) => setI({ se_income: v })} /></Field>}
+          </>)}
         {(yes("has_interest") || yes("has_dividends") || yes("has_self_employment") || inc.withholding_1099 > 0) && (
           <Field label="Federal tax withheld on 1099s"><MoneyInput value={inc.withholding_1099} onChange={(v) => setI({ withholding_1099: v })} /></Field>)}
         {(yes("student_loan") || inc.student_loan_interest > 0) && (
@@ -466,16 +483,27 @@ export default function ReturnWizard() {
                 <option value="none">None</option><option value="aotc">American Opportunity (first 4 years of college)</option><option value="llc">Lifetime Learning</option>
               </select></Field>
           </>)}
-        {(yes("has_charity") || inc.charitable > 0) && (
-          <Field label="Gifts to U.S. charities"><MoneyInput value={inc.charitable} onChange={(v) => setI({ charitable: v })} /></Field>)}
+        {(yes("has_charity") || inc.charitable > 0 || inc.charitable_noncash > 0) && (
+          <>
+            <Field label="Gifts to U.S. charities — cash or check"><MoneyInput value={inc.charitable} onChange={(v) => setI({ charitable: v })} /></Field>
+            <Field label="Gifts to U.S. charities — property (non-cash)" hint="Over $500 needs Form 8283, which TaxPrep does not prepare."><MoneyInput value={inc.charitable_noncash} onChange={(v) => setI({ charitable_noncash: v })} /></Field>
+          </>)}
         <Field label="Other state income tax paid" hint="Besides W-2 box 17 (e.g. a prior-year balance paid in 2025). Used as an itemized deduction.">
           <MoneyInput value={inc.state_tax_other} onChange={(v) => setI({ state_tax_other: v })} /></Field>
-        {isResident && <Field label="Other itemized deductions" hint="Mortgage interest, etc. We compare with the standard deduction.">
-          <MoneyInput value={inc.other_itemized} onChange={(v) => setI({ other_itemized: v })} /></Field>}
+        {!isNRA && (
+          <>
+            <Field label="Home mortgage interest (Form 1098 box 1)"><MoneyInput value={inc.mortgage_interest} onChange={(v) => setI({ mortgage_interest: v })} /></Field>
+            <Field label="Property (real estate) tax paid"><MoneyInput value={inc.real_estate_tax} onChange={(v) => setI({ real_estate_tax: v })} /></Field>
+            <Field label="Unreimbursed medical and dental expenses" hint="Only the part above 7.5% of your AGI is deductible."><MoneyInput value={inc.medical_expenses} onChange={(v) => setI({ medical_expenses: v })} /></Field>
+            <Field label="Other itemized deductions" hint="Only items listed for Schedule A line 16 (e.g. gambling losses up to winnings). We compare itemized with the standard deduction.">
+              <MoneyInput value={inc.other_itemized} onChange={(v) => setI({ other_itemized: v })} /></Field>
+          </>)}
         <Field label="2025 estimated tax payments"><MoneyInput value={inc.estimated_payments} onChange={(v) => setI({ estimated_payments: v })} /></Field>
-        {isResident && inc.qualifying_children === 0 && (
-          <Field label="Your age on Dec 31, 2025" hint="Earned income credit without children requires age 25-64.">
-            <MoneyInput integer value={inc.age} onChange={(v) => setI({ age: v })} /></Field>)}
+        <Field label="Your age on Dec 31, 2025" hint="Used for the 65+ deductions and the earned income credit age test.">
+          <MoneyInput integer value={inc.age} onChange={(v) => setI({ age: v })} /></Field>
+        {inc.filing_status === "mfj" && <Field label="Spouse's age on Dec 31, 2025"><MoneyInput integer value={inc.spouse_age} onChange={(v) => setI({ spouse_age: v })} /></Field>}
+        {!isNRA && <ForeignAccounts inc={inc} setI={setI} />}
+        {!isNRA && <DependentsEditor value={inc.dependents} onChange={(v) => setI({ dependents: v })} />}
       </div>
     </>
   );
