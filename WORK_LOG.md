@@ -51,3 +51,8 @@ Public API calls are disabled by default, and Render endpoints are rejected. Aft
 - The connected frontend deployment became Ready. A hosted browser check registered a new synthetic account, created/saved a return, and calculated the wages example: $925 federal and $677 California refunds (the browser example selected the $60 CA renter credit). This differs from the API-only $617 California example by exactly that credit.
 - The public results page still displayed filing directions and a past deadline despite its synthetic-only notice. Removed those directions and changed the PDF action to `Download synthetic preview PDF`; the frontend production build passed. This last UI change still requires deployment verification.
 - Security and tax correctness review remain incomplete. Only synthetic test data is permitted; do not treat this as a filing-ready tax service.
+
+## November 1, 2026: UI redesign
+
+- Restyled the frontend into a "ledger" design: new tokens, fonts, header/footer, hero with an example 1040 card, dashboard cards, and a wizard progress bar with step pills. No API, tax-engine or route changes.
+- Type check and production build passed. Desktop and mobile screenshots (mocked API) in `docs/ui-redesign/`. Details are in `docs/UI_REDESIGN.md`.

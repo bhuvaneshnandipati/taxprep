@@ -1,20 +1,36 @@
-@import url('https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;600;700&family=IBM+Plex+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Geist:wght@400..700&family=Geist+Mono:wght@400;500;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body { @apply bg-paper text-ink font-sans; }
+/* TaxPrep ledger UI: warm paper, white form "sheets", electric-blue actions,
+   highlighter-yellow focus, monospace form-line numbers. */
+body {
+  @apply bg-paper text-ink font-sans antialiased;
+  background-image: radial-gradient(rgba(15,26,42,.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+h1, h2, h3 { @apply font-display text-ink tracking-tight; }
+h2 { @apply font-bold; }
+::selection { @apply bg-marker text-ink; }
+:focus-visible { outline: 2px solid #1D3FD6; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
 /* Avoid iOS input zoom while preserving desktop field sizing. */
 @media (max-width: 640px) {
   input, select, textarea { font-size: 16px !important; }
   button, a.btn, a.btn-ghost { min-height: 44px; }
 }
 
-.inp { @apply w-full px-3 py-2.5 border-[1.5px] border-rule rounded-md text-[15px] bg-white outline-none focus:border-formblue; }
-.lbl { @apply block text-xs font-semibold uppercase tracking-wider text-formblue mb-1.5; }
-.btn { @apply px-6 py-3 bg-formblue text-white rounded-md text-[15px] font-semibold cursor-pointer disabled:opacity-50; }
-.btn-ghost { @apply px-6 py-3 bg-transparent text-formblue border-[1.5px] border-formblue rounded-md text-[15px] font-semibold cursor-pointer; }
-.card { @apply bg-white border-[1.5px] border-rule rounded-lg p-5; }
-.chip { @apply px-4 py-2.5 rounded-md border-[1.5px] text-sm cursor-pointer; }
-.chip-on { @apply border-formblue bg-bluesoft text-formblue font-semibold; }
-.chip-off { @apply border-rule bg-white text-ink; }
+.inp { @apply w-full px-3.5 py-2.5 rounded-lg border border-rule bg-surface text-[15px] text-ink outline-none transition
+  placeholder:text-gray-400 hover:border-gray-400 focus:border-ink focus:bg-markersoft focus:shadow-[0_0_0_3px_#FFE066]; }
+.lbl { @apply block font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-mute mb-1.5; }
+.btn { @apply inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-formblue text-white text-[15px] font-semibold cursor-pointer transition
+  shadow-[0_6px_16px_-8px_rgba(29,63,214,.7)] hover:bg-cobaltdeep active:translate-y-px disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none; }
+.btn-ghost { @apply inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-surface text-ink border border-rule text-[15px] font-semibold cursor-pointer transition hover:border-ink; }
+.card { @apply bg-surface border border-hair rounded-2xl p-5 shadow-sheet; }
+.chip { @apply px-4 py-2 rounded-full border text-sm cursor-pointer transition; }
+.chip-on { @apply border-ink bg-ink text-white font-semibold; }
+.chip-off { @apply border-rule bg-surface text-ink hover:border-ink; }
+.kicker { @apply font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-mute; }
+.mark { background: linear-gradient(transparent 58%, #FFE066 58%, #FFE066 92%, transparent 92%); padding: 0 .08em; }
