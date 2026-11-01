@@ -154,12 +154,29 @@ def test_login_lockout():
     assert c.post("/auth/login", data={"username": "lock@test.com", "password": "password123"}).status_code == 429
 
 
-def test_invite_only_registration(monkeypatch):
+def test_open_signup_with_cap_and_ip_limit(monkeypatch):
     from app.core.config import settings
+    from app.db.session import SessionLocal
+    from app.db.models import User
     c = _client()
     monkeypatch.setattr(settings, "PRODUCTION", True)
     monkeypatch.setattr(settings, "REGISTRATION_EMAILS", [])
-    assert c.post("/auth/register", json={"email": "x@test.com", "password": "password123"}).status_code == 403
+    db = SessionLocal(); n = db.query(User).count(); db.close()
+    # anyone can register while under the cap
+    monkeypatch.setattr(settings, "MAX_USERS", n + 1)
+    monkeypatch.setattr(settings, "MAX_SIGNUPS_PER_IP_PER_DAY", 100)
+    assert c.get("/auth/signup-status").json()["open"] is True
+    assert c.post("/auth/register", json={"email": "anyone@test.com", "password": "password123"}).status_code == 200
+    # cap reached -> full
+    assert c.get("/auth/signup-status").json()["open"] is False
+    r = c.post("/auth/register", json={"email": "late@test.com", "password": "password123"})
+    assert r.status_code == 403 and "full" in r.json()["detail"]
+    # per-IP daily limit
+    monkeypatch.setattr(settings, "MAX_USERS", n + 100)
+    monkeypatch.setattr(settings, "MAX_SIGNUPS_PER_IP_PER_DAY", 1)
+    assert c.post("/auth/register", json={"email": "second@test.com", "password": "password123"}).status_code == 429
+    # optional allowlist still works when set
+    monkeypatch.setattr(settings, "MAX_SIGNUPS_PER_IP_PER_DAY", 100)
     monkeypatch.setattr(settings, "REGISTRATION_EMAILS", ["family@test.com"])
     assert c.post("/auth/register", json={"email": "y@test.com", "password": "password123"}).status_code == 403
     assert c.post("/auth/register", json={"email": "Family@test.com", "password": "password123"}).status_code == 200

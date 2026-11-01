@@ -1,11 +1,11 @@
 # TaxPrep security and privacy — November 1, 2026
 
-TaxPrep is set up for real returns by the owner and invited family members. This page records what protects the data, what changed, and the settings the owner must keep.
+TaxPrep is set up for real returns by a limited number of users: anyone can sign up until the account limit is reached. This page records what protects the data, what changed, and the settings the owner must keep.
 
 ## Why the earlier version was not safe for real SSNs
 | Earlier gap | Risk | Fix (this release) |
 |---|---|---|
-| Anyone on the internet could create an account | Strangers storing data, abuse of the free database | **Invite-only sign-up:** `REGISTRATION_EMAILS` lists who may register. In production an empty list means nobody can. |
+| Anyone on the internet could create unlimited accounts | Abuse of the free database | **Capped sign-up:** anyone may register until `MAX_USERS` accounts exist (default 25); at most `MAX_SIGNUPS_PER_IP_PER_DAY` (default 3) new accounts per network per day. Optional `REGISTRATION_EMAILS` restricts sign-up to listed emails. |
 | Unlimited password guesses | Account takeover by guessing | **Lockout:** 5 failures per email (or 20 per IP) in 15 minutes blocks sign-in. Stored in the database, so it works on serverless. |
 | Login token (JWT) kept in browser `localStorage` for 4 hours, and sign-out only cleared the browser | Any injected script could steal the token, and a stolen token stayed valid | **Server-side sessions** in an `HttpOnly; Secure; SameSite=Strict` cookie that page scripts cannot read. Sign-out deletes the session on the server. Sessions end after 60 minutes of inactivity and 12 hours at most. Only a SHA-256 hash of each token is stored. |
 | No cross-site request protection was needed for bearer tokens, but cookies need it | Another site could submit requests with the user's cookie | **CSRF guard:** cookie-authenticated changes must carry an `X-TaxPrep` header, which other sites cannot add. |
@@ -22,12 +22,12 @@ The browser only talks to the TaxPrep website. Calls to `/api/*` are forwarded b
 ## Settings to keep in Vercel
 | Project | Variable | Value |
 |---|---|---|
-| taxprep-api | `REGISTRATION_EMAILS` | Comma-separated emails of you and family. **Set this before anyone signs up.** |
+| taxprep-api | `MAX_USERS` (optional) | Maximum number of accounts; default 25. Set `0` to close sign-up. |
 | taxprep-api | `DATA_KEY` | Already set. **Back it up somewhere safe outside Vercel** (e.g. a password manager). If it is lost, every encrypted return becomes unreadable. Never change it without a re-encryption plan. |
 | taxprep-api | `JWT_SECRET`, `DATABASE_URL`, `PRODUCTION=1`, `CORS_ORIGINS` | Unchanged. |
 | taxprep (frontend) | `API_ORIGIN` (optional) | `https://taxprep-api.vercel.app`. The existing `NEXT_PUBLIC_API_URL` already works as the fallback. |
 
-Optional tuning: `SESSION_IDLE_MINUTES`, `SESSION_MAX_HOURS`, `MAX_FAILED_PER_EMAIL`, `MAX_FAILED_PER_IP`, `LOCKOUT_MINUTES`.
+Optional tuning: `MAX_SIGNUPS_PER_IP_PER_DAY`, `REGISTRATION_EMAILS`, `SESSION_IDLE_MINUTES`, `SESSION_MAX_HOURS`, `MAX_FAILED_PER_EMAIL`, `MAX_FAILED_PER_IP`, `LOCKOUT_MINUTES`.
 
 ## Remaining risks you accept by self-hosting
 - **Backups:** Neon Free keeps limited history. Download your filed return PDFs and keep them; the IRS asks you to keep records for at least 3 years.
