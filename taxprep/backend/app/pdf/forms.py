@@ -265,9 +265,10 @@ def build_package(taxpayer: dict, profile: dict, result: dict, year: int = 2025)
         if st["state"] == "CA":
             if st["form"] == "540":
                 add(official.ca_540(year, taxpayer, fed, st, ca_in), "California Form 540")
+                add(official.ca_schedule_ca(year, taxpayer, fed, st, result.get("_fed_input")), "California Schedule CA (540)")
             else:
                 add(official.ca_540nr(year, taxpayer, fed, st, ca_in), "California Form 540NR")
-            if abs(st["lines"].get("ca_agi", 0) - L["agi"]) >= 1 or st["form"] == "540NR":
+            if st["form"] == "540NR":
                 missing.append("California Schedule CA (" + ("540" if st["form"] == "540" else "540NR") +
                                ") — shows the adjustments on lines 14/16")
         elif st["state"] == "NY":

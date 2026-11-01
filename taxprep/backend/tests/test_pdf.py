@@ -64,7 +64,9 @@ def test_india_nra_package_uses_official_forms():
     assert "45120" in ca2 and "39414" in ca2          # CA AGI incl. interest; taxable = 45,120 - 5,706
     f8843 = _page(doc, "Statement for Exempt Individuals")
     assert "365" in f8843 and "India" in f8843
-    assert doc.page_count == 1 + 2 + 1 + 2 + 6       # cover, 1040-NR, OI, 8843 (form pages only), 540
+    assert doc.page_count == 1 + 2 + 1 + 2 + 6 + 6   # cover, 1040-NR, OI, 8843, 540, Schedule CA (540)
+    sca = _page(doc, "California Adjustments")
+    assert "120" in sca          # NRA-exempt interest added back in column C (taxable in California)
 
 
 def test_china_treaty_on_line_1k_and_schedule_oi():

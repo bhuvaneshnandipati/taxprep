@@ -128,7 +128,7 @@ The PDF is a clean filing package: no preview stamp, and a cover page with signi
 - ~~Form 8949~~: now generated from the sales list (all six boxes per part, including 1099-DA crypto).
 - **Form 8283:** non-cash gifts over $500.
 
-- **California:** Schedule CA (540 / 540NR) is not generated. The rate schedule is used instead of the FTB tax table (±$1–2). CalEITC/YCTC and the health-coverage penalty are not computed.
+- **California:** Schedule CA (540) and the FTB tax table are now used. Schedule CA (540NR) is not generated (attach it yourself). CalEITC/YCTC and the health-coverage penalty are not computed.
 - **New York:** NYC and Yonkers resident tax, NY EITC and household credit, and recapture above the first tier are not computed.
 - **Dual-status:** investment income above the NIIT threshold is blocked. Non-wage income is treated as received in the resident period.
 - **Treaty time limits:** must be confirmed against Pub. 901.

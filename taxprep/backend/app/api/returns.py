@@ -283,7 +283,7 @@ def run_calculation(r: TaxReturn) -> dict:
             "_state_wages": sum(w["state_wages"] or w["wages"] for w in w2s if (w.get("state") or state).upper() == state),
             "_state_std": std, "_wages_nr_period": inc["wages_nr_period"],
             "_payers": "; ".join(dict.fromkeys(w["employer"] for w in w2s if w.get("employer"))),
-            "_income": inc}
+            "_income": inc, "_fed_input": dict(fin.__dict__)}
 
 
 @router.post("/{rid}/calculate")

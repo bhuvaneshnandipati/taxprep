@@ -842,3 +842,60 @@ def form_8863(year, tp, fed, student: dict | None):
     if E.get("kind") == "aotc" and stu.get("refund_restricted"):
         radios["c1_1[0]"] = "1"
     return fill_pdf(template_path(year, "f8863.pdf"), v, radios=radios)
+
+
+# ======================================================================= California Schedule CA (540)
+def ca_schedule_ca(year, tp, fed, st, fi):
+    """Part I: federal amounts (column A) and California additions (column C) for treaty-exempt and
+    nonresident-alien-excluded income. Part II: CA itemized deductions when CA itemizes."""
+    L, C = fed["lines"], st["lines"]
+    name, _ = _head(tp)
+    F = lambda n: f"540ca_form - {n}"
+    fi = fi or {}
+    from ..engines.rules_loader import load_rules
+    cl = load_rules("federal")["capital_loss_limit"][fed["filing_status"]]
+    net_cg = fi.get("capital_gain_st", 0) + fi.get("capital_gain_lt", 0)
+    ca_cg = net_cg if net_cg >= 0 else max(net_cg, -cl)
+    add = {
+        "wages": fi.get("wages", 0) + fi.get("comp_1042s", 0) - L["wages"],
+        "interest": fi.get("interest", 0) - L["taxable_interest"],
+        "dividends": fi.get("dividends", 0) - L["ordinary_dividends"],
+        "cg": ca_cg - L["capital_gain"],
+        "business": fi.get("se_income", 0) - L["sched1_business"],
+        "scholarship": fi.get("scholarship_taxable", 0) + fi.get("scholarship_1042s", 0) - L["sched1_scholarship"],
+    }
+    add = {k: round(v) for k, v in add.items()}
+    total_c = sum(add.values())
+    residual = round(C.get("ca_agi", 0) - L["agi"] - total_c)
+    v = {F(1000): name, F(1001): ssn_dashed(tp.get("ssn", "")),
+         F(1002): money(L["wages"]), F(1004): money(add["wages"]), F(1027): money(L["wages"]), F(1029): money(add["wages"]),
+         F(1031): money(L["taxable_interest"]), F(1033): money(add["interest"]),
+         F(1035): money(L["ordinary_dividends"]), F(1037): money(add["dividends"]),
+         F(1049): money(L["capital_gain"]), F(1051): money(add["cg"]),
+         F(1056): money(L["sched1_business"]), F(1058): money(add["business"]),
+         F(2030): money(L["sched1_scholarship"])}
+    other = add["scholarship"] + residual
+    if other:
+        v.update({F(2037): "Treaty-exempt scholarship / CA nonconformity", F(2040): money(other)})
+    v.update({F(3007): money(L["total_income"], blank_zero=False), F(3009): money(total_c + residual),
+              F(3019): money(L["adj_half_se"]), F(3032): money(L["adj_student_loan"]),
+              F(4029): money(L["adjustments"]), F(4032): money(L["agi"], blank_zero=False),
+              F(4034): money(total_c + residual)})
+    radios = {}
+    ca_item = C.get("deduction", 0)
+    if ca_item and L.get("sa_total") and ca_item != round(load_rules("california")["standard_deduction"][fed["filing_status"]]):
+        b = L["sa_state_income_tax"]
+        c = max(0, L["sa_salt_paid"] - L["salt_deduction"])
+        v.update({F(5001): money(L["sa_medical_paid"]), F(5002): money(L["agi"]), F(5003): money(round(L["agi"] * 0.075)),
+                  F(5004): money(L["sa_medical"]), F(5006): money(L["sa_state_income_tax"]), F(5007): money(b),
+                  F(5008): money(L["sa_real_estate_tax"]), F(5010): money(L["sa_salt_paid"]),
+                  F(5011): money(L["salt_deduction"]), F(5012): money(b), F(5013): money(c),
+                  F(5018): money(L["salt_deduction"]), F(5019): money(b), F(5020): money(c),
+                  F(5021): money(L["sa_mortgage"]), F(5027): money(L["sa_mortgage"]), F(5033): money(L["sa_mortgage"]),
+                  F(6001): money(L["sa_gifts_cash"]), F(6004): money(L["sa_gifts_noncash"]), F(6010): money(L["sa_gifts"]),
+                  F(6016): money(L["sa_other"]), F(6019): money(L["sa_total"]), F(6020): money(b), F(6021): money(c),
+                  F(6022): money(L["sa_total"] - b + c), F(6031): money(L["sa_total"] - b + c),
+                  F(6034): money(L["sa_total"] - b + c), F(6035): money(ca_item), F(6036): money(ca_item)})
+        if L.get("deduction_type") != "itemized":
+            radios[F("5000 CB")] = "Yes"
+    return fill_pdf(template_path(year, f"{year}-540-ca.pdf"), v, radios=radios)
