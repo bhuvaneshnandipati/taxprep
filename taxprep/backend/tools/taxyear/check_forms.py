@@ -60,6 +60,8 @@ def check(year: int, download: bool, log) -> list[dict]:
             log.debug("%s %s -> printed_year=%s draft=%s", f["id"], url, py, draft)
             if f.get("undated") and not draft:
                 py = year      # revision-dated form: the current revision is the one to use
+            elif py is None and "{year}" in f["url"] and url == f["url"].format(year=year):
+                py = year      # no readable year (e.g. NY prints it in a barcode); the year-specific URL decides
             if py != year:
                 row["status"], row["printed_year"] = "NOT_YET_PUBLISHED", py
                 continue
