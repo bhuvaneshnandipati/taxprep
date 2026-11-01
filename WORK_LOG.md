@@ -115,3 +115,9 @@ Public API calls are disabled by default, and Render endpoints are rejected. Aft
 - **Still not computed** (listed in `taxprep/FIXES.md` and on the PDF cover):
   - California: Schedule CA (540NR), CalEITC/YCTC, health-coverage penalty.
   - New York: NY/NYC EITC and household credits, Empire State child credit, part-year NYC/Yonkers.
+
+## November 1, 2026: open sign-up with an account limit
+
+- Sign-up no longer needs an email list. Anyone can register until `MAX_USERS` accounts exist (default 25; `0` closes sign-up), with at most 3 new accounts per network per day (`MAX_SIGNUPS_PER_IP_PER_DAY`). `REGISTRATION_EMAILS` remains as an optional restriction.
+- `GET /auth/signup-status` lets the sign-in page show "Sign-up is full".
+- Backend: 125 passed, 2 skipped. Frontend build passed.

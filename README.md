@@ -5,7 +5,7 @@ Application source is in `taxprep/`.
 
 ## Use as a hosted website
 
-The website is https://taxprep-mu.vercel.app (invite-only; see [security](docs/SECURITY.md)), with a separate hosted API and Neon database. [Website status and limits](WEBSITE.md) document the free Vercel + Neon route. Returns are filed by mail with the generated package; see [what is supported](taxprep/FIXES.md#current-coverage-november-1-2026).
+The website is https://taxprep-mu.vercel.app (open sign-up up to an account limit; see [security](docs/SECURITY.md)), with a separate hosted API and Neon database. [Website status and limits](WEBSITE.md) document the free Vercel + Neon route. Returns are filed by mail with the generated package; see [what is supported](taxprep/FIXES.md#current-coverage-november-1-2026).
 
 To move to a new tax year (e.g. 2026) or new forms, see the [tax-year update kit](docs/TAX_YEAR_UPDATE_KIT.md). For a complete 2025 status record and a file-by-file path to a future tax-year 2026 release, see the [tax-year handoff](TAX_YEAR_HANDOFF.md).
 

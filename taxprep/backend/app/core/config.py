@@ -18,8 +18,11 @@ class Settings:
     MAX_FAILED_PER_EMAIL = int(os.getenv("MAX_FAILED_PER_EMAIL", "5"))
     MAX_FAILED_PER_IP = int(os.getenv("MAX_FAILED_PER_IP", "20"))
     LOCKOUT_MINUTES = int(os.getenv("LOCKOUT_MINUTES", "15"))
-    # Invite-only sign-up: comma-separated emails allowed to create an account.
-    # In production an empty list means nobody can register (existing accounts still sign in).
+    # Open sign-up with a cap: anyone may register until MAX_USERS accounts exist (0 = closed).
+    MAX_USERS = int(os.getenv("MAX_USERS", "25"))
+    # Abuse guard: at most this many new accounts per IP address per 24 hours.
+    MAX_SIGNUPS_PER_IP_PER_DAY = int(os.getenv("MAX_SIGNUPS_PER_IP_PER_DAY", "3"))
+    # Optional: if set, only these comma-separated emails may register (the cap still applies).
     REGISTRATION_EMAILS = [e.strip().lower() for e in os.getenv("REGISTRATION_EMAILS", "").split(",") if e.strip()]
     PRODUCTION = any(os.getenv(n, "").lower() not in ("", "0", "false") for n in ("PRODUCTION", "RENDER", "VERCEL"))
     DEFAULT_TAX_YEAR = 2025

@@ -18,30 +18,45 @@ def _set_cookie(resp: Response, token: str):
                     max_age=settings.SESSION_MAX_HOURS * 3600, path="/")
 
 
-def _registration_allowed(email: str, admins: list[str]) -> bool:
-    if email in admins:
-        return True                     # still needs ADMIN_SETUP_CODE below
-    if settings.REGISTRATION_EMAILS:
-        return email in settings.REGISTRATION_EMAILS
-    return not settings.PRODUCTION      # open only for local development
+def _signup_state(db: Session) -> dict:
+    users = db.query(User).count()
+    return {"open": settings.MAX_USERS > 0 and users < settings.MAX_USERS,
+            "remaining": max(0, settings.MAX_USERS - users)}
+
+
+@router.get("/signup-status")
+def signup_status(db: Session = Depends(get_db)):
+    """Lets the sign-in page say whether new accounts can still be created."""
+    return {"open": _signup_state(db)["open"]}
 
 
 @router.post("/register", response_model=TokenOut)
-def register(body: RegisterIn, response: Response, db: Session = Depends(get_db)):
+def register(body: RegisterIn, request: Request, response: Response, db: Session = Depends(get_db)):
+    from datetime import datetime, timedelta, timezone
     email = body.email.lower()
     admins = [e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()]
-    if not _registration_allowed(email, admins):
-        raise HTTPException(403, "Sign-up is by invitation only. Ask the site owner to add your email.")
+    is_admin = email in admins
+    if not is_admin:
+        if settings.REGISTRATION_EMAILS and email not in settings.REGISTRATION_EMAILS:
+            raise HTTPException(403, "Sign-up is limited to invited emails.")
+        if not _signup_state(db)["open"]:
+            raise HTTPException(403, "Sign-up is full: the maximum number of accounts has been reached.")
+        ip = client_ip(request)
+        since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1)
+        recent = db.query(AuditLog).filter(AuditLog.action == "register", AuditLog.detail == ip,
+                                           AuditLog.at >= since).count()
+        if recent >= settings.MAX_SIGNUPS_PER_IP_PER_DAY:
+            raise HTTPException(429, "Too many new accounts from this network today. Try again tomorrow.")
     if db.query(User).filter_by(email=email).first():
         raise HTTPException(400, "Email already registered")
     role = "user"
-    if email in admins:
+    if is_admin:
         code = os.getenv("ADMIN_SETUP_CODE", "")
         if not code or not hmac.compare_digest(code, body.admin_code or ""):
             raise HTTPException(403, "This email is reserved for the administrator. Enter the admin setup code.")
         role = "admin"
     u = User(email=email, hashed_password=hash_password(body.password), full_name=body.full_name, role=role)
-    db.add(u); db.add(AuditLog(user_email=email, action="register"))
+    db.add(u); db.add(AuditLog(user_email=email, action="register", detail=client_ip(request)))
     token = create_session(db, email); db.commit()
     _set_cookie(response, token)
     return TokenOut(access_token=token)

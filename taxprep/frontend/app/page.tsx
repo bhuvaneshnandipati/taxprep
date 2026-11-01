@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { login, register } from "@/lib/api";
 
@@ -12,6 +12,10 @@ export default function AuthPage() {
   const [adminCode, setAdminCode] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [signupOpen, setSignupOpen] = useState(true);
+  useEffect(() => {
+    fetch("/api/auth/signup-status").then((r) => r.json()).then((d) => setSignupOpen(d.open !== false)).catch(() => {});
+  }, []);
 
   const submit = async () => {
     setErr(""); setBusy(true);
@@ -55,6 +59,8 @@ export default function AuthPage() {
           <button className={`chip ${mode === "login" ? "chip-on" : "chip-off"}`} type="button" onClick={() => setMode("login")}>Sign in</button>
           <button className={`chip ${mode === "register" ? "chip-on" : "chip-off"}`} type="button" onClick={() => setMode("register")}>Create account</button>
         </div>
+        {mode === "register" && !signupOpen && (
+          <p role="status" className="text-sm mb-4 rounded-lg bg-markersoft border border-marker px-3 py-2">Sign-up is full: TaxPrep has reached its account limit. Existing users can still sign in.</p>)}
         {mode === "register" && (
           <div className="mb-4"><label className="lbl" htmlFor="full-name">Full name</label>
             <input id="full-name" autoComplete="name" className="inp" value={name} onChange={(e) => setName(e.target.value)} /></div>
@@ -69,7 +75,7 @@ export default function AuthPage() {
             <input className="inp mt-2" value={adminCode} onChange={(e) => setAdminCode(e.target.value)} placeholder="Only for the site administrator" />
           </details>)}
         {err && <p role="alert" className="text-sm text-owe mb-4">{err}</p>}
-        <button className="btn w-full" type="submit" disabled={busy}>
+        <button className="btn w-full" type="submit" disabled={busy || (mode === "register" && !signupOpen)}>
           {busy ? "Working…" : mode === "login" ? "Sign in" : "Create account"}
         </button>
       </form></div>
