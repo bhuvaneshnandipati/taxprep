@@ -22,3 +22,37 @@ state:
   NY:
     no_payment: "State Processing Center, PO Box 61000, Albany, NY 12261-0001"
     payment: "State Processing Center, PO Box 15555, Albany, NY 12212-5555"
+
+# Private delivery services (UPS, FedEx, DHL) cannot deliver to P.O. boxes. All returns,
+# with or without payment, go to the processing center's street address.
+# Sources (checked 2026-11-01):
+#   https://www.irs.gov/filing/submission-processing-center-street-addresses-for-private-delivery-service-pds
+#   https://www.ftb.ca.gov/help/contact/mailing-addresses.html
+#   https://www.tax.ny.gov/pit/file/return-assembly-mail.htm
+private_delivery:
+  irs_centers:
+    Austin: "Austin - Internal Revenue Submission Processing Center, 3651 S IH35, Austin, TX 78741"
+    Kansas City: "Kansas City - Internal Revenue Submission Processing Center, 333 W. Pershing, Kansas City, MO 64108"
+    Ogden: "Ogden - Internal Revenue Submission Processing Center, 1973 Rulon White Blvd., Ogden, UT 84201"
+  # which center each USPS no-payment address belongs to
+  federal:
+    "1040-NR": Austin
+    "1040 (Dual-Status)": Austin
+    "8843-only": Austin
+    "1040": { CA: Ogden, NY: Kansas City }
+  state:
+    CA: "Franchise Tax Board, Sacramento, CA 95827-1500"
+    NY: "NYS Tax Department, RPC - PIT, 90 Cohoes Ave, Green Island, NY 12183-1515"
+
+# Original due dates for tax year 2025 returns. Sources: IRS "When to file"
+# (https://www.irs.gov/filing/individuals/when-to-file), 2025 Form 1040-NR instructions,
+# FTB 540 booklet, NY IT-201 instructions.
+due_dates:
+  federal: "April 15, 2026"
+  federal_nr_no_wage_withholding: "June 15, 2026"   # 1040-NR / 8843-only without wages subject to U.S. withholding
+  CA: "April 15, 2026 (automatic 6-month extension to file, not to pay)"
+  NY: "April 15, 2026"
+payment:
+  federal: "Check or money order payable to \"United States Treasury\". Write your SSN/ITIN, \"2025 Form {form}\" and your phone number on it, and enclose Form 1040-V (do not staple). Or pay online at irs.gov/payments."
+  CA: "Check or money order payable to \"Franchise Tax Board\". Write your SSN/ITIN and \"2025 Form {form}\" on it. Or pay online at ftb.ca.gov/pay."
+  NY: "Check or money order payable to \"New York State Income Tax\". Write the last four digits of your SSN, \"2025 {form}\" and include Form IT-201-V. Or pay online at tax.ny.gov."

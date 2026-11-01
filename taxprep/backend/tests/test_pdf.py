@@ -44,9 +44,12 @@ INDIA = ({"visa": "F-1", "country": "India", "first_entry_year": 2023, "days_cur
 def test_india_nra_package_uses_official_forms():
     res, doc = _pkg(*INDIA)
     cover = doc[0].get_text()
-    assert "SYNTHETIC TEST PREVIEW - DO NOT FILE" in cover
-    assert "Where and when to mail" not in cover
-    assert "Sign and date each return" not in cover
+    assert "SYNTHETIC" not in cover and "DO NOT FILE" not in cover
+    text = " ".join(" ".join(p.get_text().split()) for p in doc[:2])   # cover may run to a 2nd page
+    assert "How to file by mail" in text and "Sign and date" in text
+    # 1040-NR: USPS P.O. address plus the Austin street address for couriers
+    assert "Austin, TX 73301-0215" in text and "3651 S IH35, Austin, TX 78741" in text
+    assert "Franchise Tax Board, PO Box 942840" in text and "Sacramento, CA 95827-1500" in text
     titles = [p.get_text()[:120] for p in doc]
     assert any("1040-NR" in t and "Nonresident Alien Income Tax Return" in t for t in titles)
     assert any("SCHEDULE OI" in t for t in titles)

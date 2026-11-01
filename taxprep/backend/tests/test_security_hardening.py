@@ -107,17 +107,20 @@ def test_applied_document_cannot_be_reopened_and_duplicated():
 
 
 
-def test_every_pdf_page_carries_synthetic_preview_mark():
+def test_pdf_has_no_preview_stamp_and_courier_address():
     from app.api.returns import run_calculation
     from app.pdf.forms import build_package
     from types import SimpleNamespace
     import pymupdf
     row = SimpleNamespace(profile={'citizen': True}, tax_year=2025,
-                          income={'state': 'TX', 'w2s': [{'wages': 45000}]})
+                          income={'state': 'NY', 'w2s': [{'wages': 45000, 'state': 'NY'}]})
     result = run_calculation(row)
-    doc = pymupdf.open('pdf', build_package({'first_name': 'Synthetic', 'last_name': 'Example'}, row.profile, result))
-    assert 'DO NOT FILE' in doc.metadata['title']
-    assert all('SYNTHETIC TEST PREVIEW - DO NOT FILE' in page.get_text() for page in doc)
+    doc = pymupdf.open('pdf', build_package({'first_name': 'Test', 'last_name': 'Example'}, row.profile, result))
+    assert 'DO NOT FILE' not in doc.metadata['title']
+    assert not any('SYNTHETIC' in page.get_text() for page in doc)
+    cover = " ".join(" ".join(p.get_text().split()) for p in doc[:2])
+    assert "333 W. Pershing, Kansas City, MO 64108" in cover          # NY resident 1040 -> Kansas City
+    assert "90 Cohoes Ave, Green Island, NY 12183-1515" in cover
 
 
 # ---------------------------------------------------------------- sessions, lockout, invite-only, CSRF

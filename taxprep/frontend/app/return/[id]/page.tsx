@@ -503,8 +503,22 @@ export default function ReturnWizard() {
       <button className="btn w-full sm:w-auto mb-2" disabled={busy} onClick={async () => {
         setBusy(true); setErr("");
         try { await downloadPackage(rid, TAX_YEAR); } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
-      }}>{busy ? "Preparing…" : "Download synthetic preview PDF"}</button>
-      <p className="text-xs text-gray-500 mb-8">These are unreviewed test estimates. The PDF contains draft forms for synthetic testing only. Do not sign or file it.</p>
+      }}>{busy ? "Preparing…" : "Download filing package (PDF)"}</button>
+      <p className="text-xs text-gray-500 mb-6">The PDF has the official forms filled in, plus a first page with signing, attachment and mailing instructions (keep that page; don&apos;t mail it).</p>
+      {result?.mailing?.federal && (
+        <div className="card mb-6">
+          <h3 className="font-bold mb-3">Where to mail</h3>
+          {[{ t: `Federal · Form ${F!.form}`, usps: result.mailing.federal, pds: result.mailing.federal_private_delivery },
+            ...(result.mailing.state ? [{ t: `${C!.state} · Form ${C!.form}`, usps: result.mailing.state, pds: result.mailing.state_private_delivery }] : [])].map((m) => (
+            <div key={m.t} className="mb-4 last:mb-0">
+              <div className="lbl">{m.t}</div>
+              <p className="text-sm"><span className="font-semibold">USPS:</span> {m.usps}</p>
+              {m.pds && <p className="text-sm"><span className="font-semibold">UPS / FedEx:</span> {m.pds}</p>}
+            </div>
+          ))}
+          <p className="text-xs text-mute mt-3">UPS and FedEx can&apos;t deliver to P.O. boxes, so they use the street address. Sign every return and attach your W-2s before mailing.</p>
+        </div>
+      )}
       <h3 className="font-bold mb-2">How your tax was calculated</h3>
       <div className="card mb-6 space-y-2">
         {[...F!.explanations, ...C!.explanations].map((e, i) => <p key={i} className="text-sm text-gray-600">• {e}</p>)}

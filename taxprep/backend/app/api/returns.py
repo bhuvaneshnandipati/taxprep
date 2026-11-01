@@ -245,15 +245,27 @@ def calculate(rid: int, email: str = Depends(current_user_email), db: Session = 
 
 
 def mailing_for(fed, st, home_state: str) -> dict:
+    """USPS address (P.O. boxes differ with/without payment) plus the street address
+    for UPS/FedEx/DHL, which cannot deliver to a P.O. box."""
     M = load_rules("mailing")
     owe = fed.lines.get("refund", 0) < 0
     f = M["federal"].get(fed.form)
     if fed.form == "1040":
         f = f.get((home_state or "").upper()) or f["default"]
-    fed_addr = f if isinstance(f, str) else f["payment" if owe else "no_payment"]
-    out = {"federal": fed_addr}
+    out = {"federal": f if isinstance(f, str) else f["payment" if owe else "no_payment"]}
+    pds = M.get("private_delivery") or {}
+    center = (pds.get("federal") or {}).get(fed.form)
+    if isinstance(center, dict):
+        center = center.get((home_state or "").upper())
+    if center:
+        out["federal_private_delivery"] = pds["irs_centers"][center]
     if st.form != "none" and st.state in M["state"]:
         out["state"] = M["state"][st.state]["payment" if st.lines.get("refund", 0) < 0 else "no_payment"]
+        if (pds.get("state") or {}).get(st.state):
+            out["state_private_delivery"] = pds["state"][st.state]
+    out["due_dates"] = M.get("due_dates") or {}
+    out["payment"] = {k: v.replace("{form}", fed.form if k == "federal" else st.form)
+                      for k, v in (M.get("payment") or {}).items()}
     return out
 
 

@@ -32,12 +32,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </nav>
           </div>
         </header>
-        <div className="mx-auto w-full max-w-6xl px-5 pt-4">
-          <p role="note" className="flex items-start gap-3 rounded-xl border border-marker bg-markersoft px-4 py-2.5 text-[13px] text-gray-700">
-            <span className="mt-0.5 shrink-0 font-mono text-[10.5px] font-bold tracking-[0.1em] px-1.5 py-0.5 rounded bg-marker text-ink">PREVIEW</span>
-            <span>Synthetic test data only. Tax coverage and security review are incomplete. Do not enter real taxpayer information or file generated forms.</span>
-          </p>
-        </div>
         <div id="main" className="flex-1">{children}</div>
         <footer className="border-t border-hair mt-16">
           <div className="mx-auto max-w-6xl px-5 py-6 flex flex-wrap justify-between gap-3 text-[13px] text-mute">

@@ -16,7 +16,7 @@ export type CalcResult = {
              explanations: string[]; warnings: string[]; schedules: string[]; treaty: any };
   state: { state: string; form: string; lines: Record<string, any>; explanations: string[]; warnings?: string[] };
   checklist: string[];
-  mailing: { federal?: string; state?: string };
+  mailing: { federal?: string; state?: string; federal_private_delivery?: string; state_private_delivery?: string };
 } | null;
 
 function Row({ line, desc, val, strong, color }:
