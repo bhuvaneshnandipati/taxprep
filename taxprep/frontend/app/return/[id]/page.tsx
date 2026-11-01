@@ -516,18 +516,27 @@ export default function ReturnWizard() {
   const body = [stepAbout, stepResidency, stepInterview, stepIncome, stepResults][step];
 
   return (
-    <div className="max-w-[1060px] mx-auto px-5 pb-24 lg:pb-14">
-      <div className="flex gap-1 flex-wrap pt-4">
-        {STEPS.map((s, i) => (
-          <button key={s} onClick={() => (i < step || (i === 4 && result)) && setStep(i)}
-            className={`px-3 py-1.5 text-xs font-mono rounded ${i === step ? "bg-formblue text-white font-bold" : i < step ? "text-formblue" : "text-gray-400"}`}>
-            {i + 1} {s}
-          </button>
-        ))}
-        <a href="/dashboard" className="ml-auto px-3 py-1.5 text-xs font-mono text-gray-500">← All returns</a>
+    <div className="max-w-6xl mx-auto px-5 pb-24 lg:pb-14">
+      <div className="pt-5">
+        <div className="flex items-center justify-between mb-3">
+          <a href="/dashboard" className="text-sm text-mute hover:text-ink">← All returns</a>
+          <span className="font-mono text-[11px] text-mute">STEP {step + 1} / {STEPS.length}</span>
+        </div>
+        <div className="h-1.5 rounded-full bg-hair overflow-hidden mb-3" aria-hidden="true">
+          <div className="h-full bg-formblue rounded-full transition-all duration-500" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
+        </div>
+        <ol className="flex gap-1.5 flex-wrap">
+          {STEPS.map((s, i) => (
+            <li key={s}><button onClick={() => (i < step || (i === 4 && result)) && setStep(i)} aria-current={i === step ? "step" : undefined}
+              className={`flex items-center gap-2 pl-1 pr-3 py-1 rounded-full text-[13px] border transition ${i === step ? "bg-ink text-white border-ink" : i < step ? "bg-surface border-hair text-ink hover:border-ink" : "border-transparent text-gray-400"}`}>
+              <span className={`grid place-items-center w-6 h-6 rounded-full font-mono text-[11px] ${i === step ? "bg-marker text-ink" : i < step ? "bg-refund text-white" : "bg-hair text-gray-500"}`}>{i < step ? "✓" : i + 1}</span>
+              {s}
+            </button></li>
+          ))}
+        </ol>
       </div>
       <div className="flex gap-6 items-start pt-5">
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 card p-5 sm:p-8">
           {body}
           {err && <p className="text-sm text-owe mt-4">{err}</p>}
           {step < 4 && (
