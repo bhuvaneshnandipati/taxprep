@@ -92,3 +92,26 @@ Public API calls are disabled by default, and Render endpoints are rejected. Aft
   - local browser run (sign-up → return with SSN and a dependent → calculate → PDF → sign-out/in → resume) with no console errors;
   - filled forms rendered and checked line by line for Schedules A, 3, D, 8812, Form 8959, Form 8960 and the dependents grid.
 - **Remaining:** see "Current coverage" in `taxprep/FIXES.md`.
+
+## November 1, 2026: Forms 8949 and 8863, California and New York additions
+
+- **Federal:**
+  - Form 8949: per-sale entry, boxes A–L including 1099-DA crypto, 11 rows per page; box totals go to Schedule D.
+  - Form 8863: Parts I–III, phase-out ratio to 3 decimals. The under-24 AOTC rule is now asked (line 7) instead of blocked.
+- **California:**
+  - FTB Tax Table up to $100,000, verified against all 1,000 booklet rows.
+  - CA itemized deductions: no state income tax, no SALT cap, high-income limitation.
+  - Schedule CA (540) generated.
+- **New York:**
+  - Published NYS and NYC tax tables, imported by the new `tools/taxyear/ny_tables.py`. The rate schedule alone is off by $1 on some rows.
+  - NYC resident tax, NYC school tax credits (lines 69/69a), Yonkers surcharge, W-2 boxes 18–20.
+  - IT-201 lines 47–58 and 69–74 filled.
+- **Kit:** check_forms accepts year-specific URLs for barcode-dated NY PDFs; the playbook has a NY-tables step.
+- **Verification:**
+  - Backend: 125 passed, 2 skipped.
+  - Frontend: build passed.
+  - Local browser run: sign-up → return → calculate → PDF → sign-out/in → resume, with no errors.
+  - Rendered checks: Forms 8949, 8863, Schedule CA (540), IT-201 page 3.
+- **Still not computed** (listed in `taxprep/FIXES.md` and on the PDF cover):
+  - California: Schedule CA (540NR), CalEITC/YCTC, health-coverage penalty.
+  - New York: NY/NYC EITC and household credits, Empire State child credit, part-year NYC/Yonkers.
