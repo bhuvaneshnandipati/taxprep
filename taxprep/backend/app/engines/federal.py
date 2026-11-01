@@ -126,6 +126,8 @@ class FederalInput:
     charitable_noncash: float = 0.0       # Schedule A line 12
     spouse_age: int = 0                   # MFJ only; 0 = unknown
     fica_withheld: float = 0.0            # W-2 boxes 4 + 6 (Schedule 8812 Part II-B)
+    aotc_refund_restricted: bool = False  # Form 8863 line 7 box (under-24 student rule)
+    aotc_ineligible: bool = False         # any "Yes" on Form 8863 lines 23, 25, 26 or "No" on 24
     foreign_accounts: bool = False        # Schedule B Part III
     foreign_trust: bool = False
     qualified_tips: float = 0.0           # Schedule 1-A
@@ -381,6 +383,7 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
 
     # ---------------- credits --------------------------------------------------------------
     edu_nonref = edu_ref = 0.0
+    e8863 = {}
     if inp.education_credit_type != "none" and inp.tuition_paid > 0:
         if mode != "resident":
             ex.append("Education credits are not available to nonresident or dual-status aliens "
@@ -389,19 +392,36 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
             ex.append("Education credits are not allowed when married filing separately.")
         else:
             ec = R["education_credits"]
-            rng = ec["magi_phaseout"].get(fs)
-            if inp.education_credit_type == "aotc":
-                base = min(inp.tuition_paid, ec["aotc"]["max_expense_100pct"]) + ec["aotc"]["rate_2nd_tier"] * \
-                    max(0.0, min(inp.tuition_paid - ec["aotc"]["max_expense_100pct"], ec["aotc"]["max_expense_2nd_tier"]))
-                base = _phase(base, agi, rng)
-                edu_ref = rnd(base * ec["aotc"]["refundable_share"])
-                edu_nonref = min(base - edu_ref, tax)
-                ex.append(f"American Opportunity Credit ${base:,.0f}: ${edu_ref:,.0f} refundable, "
-                          f"${edu_nonref:,.0f} applied against tax.")
+            lo, hi = ec["magi_phaseout"].get(fs)
+            # Form 8863 lines 2-6 / 13-17: ratio of (limit - MAGI) to the range, as a decimal to 3 places
+            ratio = 1.0 if agi <= lo else 0.0 if agi >= hi else round((hi - agi) / (hi - lo), 3)
+            kind = inp.education_credit_type
+            if kind == "aotc" and inp.aotc_ineligible:
+                kind = "llc"
+                ex.append("American Opportunity Credit not allowed for this student (Form 8863 lines 23-26); "
+                          "the Lifetime Learning Credit is used instead.")
+            e = {"kind": kind, "ratio": ratio, "limit": hi, "range": hi - lo, "magi": agi, "expenses": inp.tuition_paid}
+            if kind == "aotc":
+                adj = min(inp.tuition_paid, ec["aotc"]["max_expense_100pct"] + ec["aotc"]["max_expense_2nd_tier"])
+                over = max(0.0, adj - ec["aotc"]["max_expense_100pct"])
+                line30 = (ec["aotc"]["max_expense_100pct"] + over * ec["aotc"]["rate_2nd_tier"]) if over else adj
+                line7 = rnd(line30 * ratio)
+                edu_ref = 0.0 if inp.aotc_refund_restricted else rnd(line7 * ec["aotc"]["refundable_share"])
+                line9 = line7 - edu_ref
+                edu_nonref = min(line9, tax)
+                e.update(line27=adj, line28=over, line29=over * ec["aotc"]["rate_2nd_tier"], line30=line30,
+                         line7=line7, line8=edu_ref, line9=line9, line19=edu_nonref)
+                ex.append(f"American Opportunity Credit ${line7:,.0f}: ${edu_ref:,.0f} refundable"
+                          + (" (none: under-24 student rule)" if inp.aotc_refund_restricted else "")
+                          + f", ${edu_nonref:,.0f} applied against tax.")
             else:
-                base = _phase(ec["llc"]["rate"] * min(inp.tuition_paid, ec["llc"]["expense_cap"]), agi, rng)
-                edu_nonref = min(base, tax)
+                line11 = min(inp.tuition_paid, ec["llc"]["expense_cap"])
+                line12 = line11 * ec["llc"]["rate"]
+                line18 = rnd(line12 * ratio)
+                edu_nonref = min(line18, tax)
+                e.update(line10=inp.tuition_paid, line11=line11, line12=line12, line18=line18, line19=edu_nonref)
                 ex.append(f"Lifetime Learning Credit ${edu_nonref:,.0f}.")
+            e8863 = e
             sched += ["Form 8863", "Schedule 3"]
 
     ctc = actc = odc = 0.0
@@ -540,6 +560,7 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
         "magi": r(agi), "net_investment_income": r(inp.interest + inp.dividends + max(0.0, net_cg)) if not is_nra else 0.0,
         "capital_gain_st": r(st), "capital_gain_lt": r(lt), "se_net_earnings": r(se * R["self_employment"]["net_earnings_factor"]) if se_tax else 0.0,
         "medicare_se_wages": r(med_se),
+        "e8863": {k: (r(v) if isinstance(v, float) and k != "ratio" else v) for k, v in e8863.items()},
         "s8812": {k: (r(v) if isinstance(v, float) else v) for k, v in s8812.items()},
         "sched1a_tips": r(tips_ded), "sched1a_overtime": r(ot_ded), "sched1a_total": r(s1a_total),
         "total_deductions": r(deduction + s1a_total), "taxable_income": r(taxable), "tax": r(tax),

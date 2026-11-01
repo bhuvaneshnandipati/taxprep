@@ -212,6 +212,8 @@ def build_package(taxpayer: dict, profile: dict, result: dict, year: int = 2025)
         add(official.schedule_2(year, taxpayer, fed), "Schedule 2 (Form 1040)")
     if "Schedule 3" in sched or L.get("education_credit") or L.get("sch3_refundable"):
         add(official.schedule_3(year, taxpayer, fed), "Schedule 3 (Form 1040)")
+    if "Form 8863" in sched:
+        add(official.form_8863(year, taxpayer, fed, inc.get("student")), "Form 8863")
     if "Schedule 8812" in sched:
         add(official.schedule_8812(year, taxpayer, fed), "Schedule 8812 (Form 1040)")
     if L.get("deduction_type") == "itemized" and L.get("deduction"):
@@ -250,7 +252,7 @@ def build_package(taxpayer: dict, profile: dict, result: dict, year: int = 2025)
     # schedules the engine says are needed but that are not generated here
     generated = {"Schedule 1", "Schedule 1-A", "Schedule 2", "Schedule 3", "Schedule A", "Schedule A (Form 1040-NR)",
                  "Schedule NEC (Form 1040-NR)", "Schedule OI (Form 1040-NR)", "Schedule SE", "Form 8959", "Form 8960",
-                 "Form 8833", "Form 1040-NR (dual-status statement)", "Schedule 8812", "Schedule B", "Schedule D", "Form 8949"}
+                 "Form 8833", "Form 1040-NR (dual-status statement)", "Schedule 8812", "Schedule B", "Schedule D", "Form 8949", "Form 8863"}
     if inc.get("business"):
         generated.add("Schedule C")
     for s_ in fed.get("schedules", []):

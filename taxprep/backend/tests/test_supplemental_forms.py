@@ -183,3 +183,29 @@ def test_form_8949_pages_and_schedule_d_rows():
     sd = _form(doc, "SCHEDULE D")
     assert "12,000" in sd and "10,800" in sd and "1,200" in sd      # line 2 (box B) totals
     assert "30,000" in sd and "10,000" in sd                         # line 10 (box L)
+
+
+def test_form_8863_aotc_and_under_24_rule():
+    stu = {"name": "Test Student", "ssn": "123-45-6789", "school_name": "State University", "school_address": "1 College Rd, Davis CA",
+           "school_ein": "94-1234567", "refund_restricted": False}
+    inc = {"state": "TX", "age": 22, "w2s": [{"wages": 40000}], "tuition_paid": 5000, "education_credit_type": "aotc", "student": stu}
+    res, doc = _pkg({"citizen": True}, inc)
+    L = res["federal"]["lines"]
+    # 2,000 + 25% x 2,000 = 2,500; refundable 40% = 1,000
+    assert L["e8863"]["line30"] == 2500 and L["aotc_refundable"] == 1000
+    t = _form(doc, "Education Credits")
+    assert "2,500" in t and "1,000" in t
+    p2 = _form(doc, "State University")
+    assert "Test Student" in p2
+    # under-24 restriction: no refundable part, all nonrefundable (limited by tax)
+    inc["student"] = dict(stu, refund_restricted=True)
+    res2, _ = _pkg({"citizen": True}, inc)
+    assert res2["federal"]["lines"]["aotc_refundable"] == 0
+
+
+def test_lifetime_learning_phaseout_ratio():
+    # MAGI 85,000 single: ratio (90,000 - 85,000) / 10,000 = 0.500; LLC 20% x 10,000 = 2,000 -> 1,000
+    from app.api.returns import run_calculation
+    L = run_calculation(_R({"citizen": True}, {"state": "TX", "w2s": [{"wages": 85000}], "tuition_paid": 12000,
+                                                "education_credit_type": "llc"}))["federal"]["lines"]
+    assert L["e8863"]["ratio"] == 0.5 and L["education_credit"] == 1000

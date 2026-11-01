@@ -48,7 +48,7 @@ def test_private_api_responses_are_not_cacheable():
 
 
 @pytest.mark.parametrize('income,reason', [
-    ({'age': 21, 'education_credit_type': 'aotc', 'tuition_paid': 4000}, 'AOTC'),
+    ({'age': 21, 'education_credit_type': 'aotc', 'tuition_paid': 4000}, 'line 7 question'),
     ({'w2s': [{'wages': 180000, 'ss_tax': 11160}]}, 'Social Security'),   # one employer over-withheld
 ])
 def test_unsupported_refund_scenarios_fail_closed(income, reason):

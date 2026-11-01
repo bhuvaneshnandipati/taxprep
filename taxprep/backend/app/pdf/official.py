@@ -798,3 +798,47 @@ def form_8949(year, tp, sales):
             doc.select([1 if long else 0])
             out.insert_pdf(doc)
     return out
+
+
+# ======================================================================= Form 8863
+def form_8863(year, tp, fed, student: dict | None):
+    L = fed["lines"]
+    E = L.get("e8863") or {}
+    stu = student or {}
+    name, _ = _head(tp)
+    sd = digits(tp.get("ssn", ""))
+    st_name = stu.get("name") or name
+    st_ssn = digits(stu.get("ssn") or tp.get("ssn", ""))
+    ratio = E.get("ratio", 1.0)
+    whole, frac = ("1", "000") if ratio >= 1 else ("", f"{ratio:.3f}".split(".")[1])
+    v = {"f1_1[0]": name, "f1_2[0]": sd[:3], "f1_3[0]": sd[3:5], "f1_4[0]": sd[5:]}
+    lim, rng, magi = E.get("limit", 0), E.get("range", 0), E.get("magi", 0)
+    if E.get("kind") == "aotc":
+        v.update({"f1_5[0]": money(E["line30"]), "f1_6[0]": money(lim, blank_zero=False), "f1_7[0]": money(magi, blank_zero=False),
+                  "f1_8[0]": money(max(0, lim - magi)), "f1_9[0]": money(rng, blank_zero=False),
+                  "f1_10[0]": whole, "f1_11[0]": frac, "f1_12[0]": money(E["line7"]),
+                  "f1_13[0]": money(E["line8"]), "f1_14[0]": money(E["line9"]), "f1_25[0]": money(E["line19"])})
+    else:
+        v.update({"f1_15[0]": money(E.get("line10", 0)), "f1_16[0]": money(E.get("line11", 0)),
+                  "f1_17[0]": money(E.get("line12", 0)), "f1_18[0]": money(lim, blank_zero=False),
+                  "f1_19[0]": money(magi, blank_zero=False), "f1_20[0]": money(max(0, lim - magi)),
+                  "f1_21[0]": money(rng, blank_zero=False), "f1_22[0]": whole, "f1_23[0]": frac,
+                  "f1_24[0]": money(E.get("line18", 0)), "f1_25[0]": money(E.get("line19", 0))})
+    ein = digits(stu.get("school_ein", ""))
+    v.update({"f2_1[0]": name, "f2_2[0]": sd[:3], "f2_3[0]": sd[3:5], "f2_4[0]": sd[5:],
+              "f2-5[0]": st_name, "f2_6[0]": st_ssn[:3], "f2_7[0]": st_ssn[3:5], "f2_8[0]": st_ssn[5:],
+              "f2_9[0]": stu.get("school_name", ""), "f2_10[0]": stu.get("school_address", "")})
+    for i, ch in enumerate(ein[:9]):
+        v[f"f2_{11 + i}[0]"] = ch
+    if E.get("kind") == "aotc":
+        v.update({"f2_31[0]": money(E["line27"]), "f2_32[0]": money(E["line28"]), "f2_33[0]": money(E["line29"]),
+                  "f2_34[0]": money(E["line30"])})
+    else:
+        v["f2_35[0]"] = money(E.get("line10", 0))
+    yn = lambda f, b: {f"{f}[0]": "Yes"} if b else {f"{f}[1]": "No"}
+    radios = {**yn("c2_1", stu.get("got_1098t_2025", True)), **yn("c2_2", stu.get("got_1098t_2024_box7", False)),
+              **yn("c2_5", stu.get("aotc_claimed_4_years", False)), **yn("c2_6", stu.get("half_time", True)),
+              **yn("c2_7", stu.get("completed_4_years", False)), **yn("c2_8", stu.get("felony_drug", False))}
+    if E.get("kind") == "aotc" and stu.get("refund_restricted"):
+        radios["c1_1[0]"] = "1"
+    return fill_pdf(template_path(year, "f8863.pdf"), v, radios=radios)

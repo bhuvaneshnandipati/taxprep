@@ -186,3 +186,40 @@ export function SalesEditor({ value, onChange }: { value: Sale[]; onChange: (v: 
     </div>
   );
 }
+
+export type Student = { name: string; ssn: string; school_name: string; school_address: string; school_ein: string;
+  got_1098t_2025: boolean; got_1098t_2024_box7: boolean; aotc_claimed_4_years: boolean; half_time: boolean;
+  completed_4_years: boolean; felony_drug: boolean; refund_restricted: boolean | null };
+export const emptyStudent = (): Student => ({ name: "", ssn: "", school_name: "", school_address: "", school_ein: "",
+  got_1098t_2025: true, got_1098t_2024_box7: false, aotc_claimed_4_years: false, half_time: true,
+  completed_4_years: false, felony_drug: false, refund_restricted: null });
+
+export function StudentEditor({ value, onChange, aotc, under24 }: { value: Student | null; onChange: (v: Student) => void; aotc: boolean; under24: boolean }) {
+  const s = value || emptyStudent();
+  const set = (p: Partial<Student>) => onChange({ ...s, ...p });
+  const yn = (b: boolean) => (b ? "yes" : "no");
+  return (
+    <div className="sm:col-span-2 card grid sm:grid-cols-2 gap-4">
+      <h3 className="font-bold sm:col-span-2">Student and school (Form 8863 Part III)</h3>
+      <Field label="Student name" hint="Leave blank if the student is you."><TextInput value={s.name} onChange={(v) => set({ name: v })} maxLength={60} /></Field>
+      <Field label="Student SSN" hint="Leave blank if the student is you."><TextInput value={s.ssn} onChange={(v) => set({ ssn: v })} placeholder="XXX-XX-XXXX" maxLength={11} /></Field>
+      <Field label="School name"><TextInput value={s.school_name} onChange={(v) => set({ school_name: v })} maxLength={80} /></Field>
+      <Field label="School EIN (from Form 1098-T)"><TextInput value={s.school_ein} onChange={(v) => set({ school_ein: v })} placeholder="12-3456789" maxLength={10} /></Field>
+      <Field label="School address" wide><TextInput value={s.school_address} onChange={(v) => set({ school_address: v })} maxLength={120} /></Field>
+      <Field label="Received Form 1098-T for 2025?"><YesNo value={yn(s.got_1098t_2025)} onChange={(v) => set({ got_1098t_2025: v === "yes" })} /></Field>
+      <Field label="Received a 2024 Form 1098-T with box 7 checked?"><YesNo value={yn(s.got_1098t_2024_box7)} onChange={(v) => set({ got_1098t_2024_box7: v === "yes" })} /></Field>
+      {aotc && (<>
+        <Field label="American Opportunity Credit already claimed for this student in 4 earlier years?"><YesNo value={yn(s.aotc_claimed_4_years)} onChange={(v) => set({ aotc_claimed_4_years: v === "yes" })} /></Field>
+        <Field label="Enrolled at least half-time in a degree or certificate program for one term in 2025?"><YesNo value={yn(s.half_time)} onChange={(v) => set({ half_time: v === "yes" })} /></Field>
+        <Field label="Finished the first 4 years of college before 2025?"><YesNo value={yn(s.completed_4_years)} onChange={(v) => set({ completed_4_years: v === "yes" })} /></Field>
+        <Field label="Felony drug conviction before the end of 2025?"><YesNo value={yn(s.felony_drug)} onChange={(v) => set({ felony_drug: v === "yes" })} /></Field>
+        {under24 && <Field wide label="Under-24 rule (Form 8863 line 7): does this apply to you?"
+          hint="It applies if you were under 24 at the end of 2025, at least one parent was alive, you are not filing jointly, and you were under 18, or 18 with earned income under half your support, or a full-time student aged 19-23 with earned income under half your support. If it applies, the credit is not refundable.">
+          <select className="inp" value={s.refund_restricted === null ? "" : yn(s.refund_restricted)}
+            onChange={(e) => set({ refund_restricted: e.target.value === "" ? null : e.target.value === "yes" })}>
+            <option value="">Choose…</option><option value="yes">Yes, it applies (no refundable part)</option><option value="no">No, it doesn&apos;t apply</option>
+          </select></Field>}
+      </>)}
+    </div>
+  );
+}

@@ -124,10 +124,10 @@ The PDF is a clean filing package: no preview stamp, and a cover page with signi
 **Newly supported:** 65+ standard deduction and senior deduction; Additional Medicare Tax withholding credit; excess Social Security credit (two or more employers); Schedule 8812 Part II-B; itemized detail (medical, real estate tax, mortgage interest, non-cash gifts).
 
 **Still not prepared:** listed on the cover page under "Also attach", or blocked:
-- **Form 8863 (education credits):** the credit is computed, but the form must be filled by hand.
+- ~~Form 8863~~: now generated (Parts I-III, one student); the under-24 rule is asked instead of blocked.
 - ~~Form 8949~~: now generated from the sales list (all six boxes per part, including 1099-DA crypto).
 - **Form 8283:** non-cash gifts over $500.
-- **AOTC for a student under 24:** blocked.
+
 - **California:** Schedule CA (540 / 540NR) is not generated. The rate schedule is used instead of the FTB tax table (±$1–2). CalEITC/YCTC and the health-coverage penalty are not computed.
 - **New York:** NYC and Yonkers resident tax, NY EITC and household credit, and recapture above the first tier are not computed.
 - **Dual-status:** investment income above the NIIT threshold is blocked. Non-wage income is treated as received in the resident period.

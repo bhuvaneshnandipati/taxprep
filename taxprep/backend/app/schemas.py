@@ -99,6 +99,22 @@ class SaleIn(BaseModel):
     digital_asset: bool = False                               # reported on 1099-DA (boxes G-L)
 
 
+class StudentIn(BaseModel):
+    """Form 8863 Part III (one student)."""
+    name: str = Field(default="", max_length=60)        # blank = the taxpayer
+    ssn: str = Field(default="", max_length=11)
+    school_name: str = Field(default="", max_length=80)
+    school_address: str = Field(default="", max_length=120)
+    school_ein: str = Field(default="", max_length=10)
+    got_1098t_2025: bool = True
+    got_1098t_2024_box7: bool = False
+    aotc_claimed_4_years: bool = False      # line 23
+    half_time: bool = True                  # line 24
+    completed_4_years: bool = False         # line 25
+    felony_drug: bool = False               # line 26
+    refund_restricted: Optional[bool] = None   # line 7: under-24 rule applies (must answer if under 24)
+
+
 class BusinessIn(BaseModel):
     """Schedule C. Expenses by category (line numbers in comments)."""
     description: str = Field(default="", max_length=60)      # A: principal business or profession
@@ -177,6 +193,7 @@ class IncomeIn(BaseModel):
     st_loss_carryover: Money = NonNeg        # from last year's Capital Loss Carryover Worksheet
     lt_loss_carryover: Money = NonNeg
     business: Optional[BusinessIn] = None    # Schedule C
+    student: Optional["StudentIn"] = None    # Form 8863 Part III
     sales: list[SaleIn] = Field(default=[], max_length=200)   # Form 8949 rows
     # state
     state: str = Field(default="CA", max_length=2)
@@ -211,3 +228,5 @@ class TaxpayerIn(BaseModel):
     date_of_birth: str = Field(default="", max_length=10)
     school: str = Field(default="", max_length=200)
     school_address: str = Field(default="", max_length=200)
+
+IncomeIn.model_rebuild()

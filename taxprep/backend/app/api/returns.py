@@ -176,9 +176,10 @@ def run_calculation(r: TaxReturn) -> dict:
     med = [w["medicare_wages"] if w["medicare_wages"] is not None else w["wages"] for w in w2s]
     R = load_rules("federal")
     # Fail closed for the cases that are still not supported, rather than return a wrong refund.
-    if inc["education_credit_type"] == "aotc" and inc["tuition_paid"] and inc["age"] < 24:
-        raise ValueError("AOTC for a student under 24 depends on support and parent details that are not "
-                         "collected here. Choose the Lifetime Learning Credit or leave the education credit out.")
+    stu = inc.get("student") or {}
+    if inc["education_credit_type"] == "aotc" and inc["tuition_paid"] and inc["age"] < 24 and stu.get("refund_restricted") is None:
+        raise ValueError("You are under 24: answer the Form 8863 line 7 question (whether the refundable part of the "
+                         "American Opportunity Credit is restricted for you) in the education section.")
     if res.status == "dual_status" and any(inc[k] for k in ("interest", "dividends", "capital_gain_lt", "capital_gain_st")) \
             and sum(w["wages"] for w in w2s) + inc["interest"] + inc["dividends"] > R["niit"]["magi_threshold"].get(inc["filing_status"], 200000):
         raise ValueError("Dual-status investment income above the Net Investment Income Tax threshold needs a "
@@ -229,6 +230,9 @@ def run_calculation(r: TaxReturn) -> dict:
         mortgage_interest=inc["mortgage_interest"], charitable_noncash=inc["charitable_noncash"],
         spouse_age=inc["spouse_age"], fica_withheld=sum(w["ss_tax"] + w["medicare_tax"] for w in w2s),
         foreign_accounts=inc["foreign_accounts"], foreign_trust=inc["foreign_trust"],
+        aotc_refund_restricted=bool(stu.get("refund_restricted")),
+        aotc_ineligible=bool(stu and (stu.get("aotc_claimed_4_years") or not stu.get("half_time", True)
+                                      or stu.get("completed_4_years") or stu.get("felony_drug"))),
         wages_nr_period=inc["wages_nr_period"],
         comp_1042s=inc["comp_1042s"], scholarship_1042s=inc["scholarship_1042s"],
         withholding_1042s=inc["withholding_1042s"],

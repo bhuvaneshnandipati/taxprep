@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiJson, downloadPackage, uploadDocument } from "@/lib/api";
-import { BrokerTotals, BusinessEditor, DependentsEditor, ForeignAccounts, PayersEditor, SalesEditor,
-  type Business, type Dependent, type Payer, type Sale } from "@/components/Details";
+import { BrokerTotals, BusinessEditor, DependentsEditor, ForeignAccounts, PayersEditor, SalesEditor, StudentEditor,
+  type Business, type Dependent, type Payer, type Sale, type Student } from "@/components/Details";
 import Ledger, { CalcResult, Residency, GREEN, RED } from "@/components/Ledger";
 import { MoneyInput, YesNo, Field, TextInput } from "@/components/Fields";
 
@@ -48,7 +48,7 @@ const blankIncome = {
   dependents: [] as Dependent[], interest_payers: [] as Payer[], dividend_payers: [] as Payer[],
   foreign_accounts: false, fbar_required: false, foreign_account_countries: "", foreign_trust: false,
   st_proceeds: 0, st_basis: 0, lt_proceeds: 0, lt_basis: 0, st_loss_carryover: 0, lt_loss_carryover: 0,
-  business: null as Business | null, sales: [] as Sale[],
+  business: null as Business | null, sales: [] as Sale[], student: null as Student | null,
 };
 
 export default function ReturnWizard() {
@@ -483,6 +483,8 @@ export default function ReturnWizard() {
               <select className="inp" value={inc.education_credit_type} onChange={(e) => setI({ education_credit_type: e.target.value })}>
                 <option value="none">None</option><option value="aotc">American Opportunity (first 4 years of college)</option><option value="llc">Lifetime Learning</option>
               </select></Field>
+            {inc.education_credit_type !== "none" && <StudentEditor value={inc.student} onChange={(v) => setI({ student: v })}
+              aotc={inc.education_credit_type === "aotc"} under24={inc.age > 0 && inc.age < 24} />}
           </>)}
         {(yes("has_charity") || inc.charitable > 0 || inc.charitable_noncash > 0) && (
           <>
