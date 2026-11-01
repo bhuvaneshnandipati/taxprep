@@ -44,9 +44,12 @@ INDIA = ({"visa": "F-1", "country": "India", "first_entry_year": 2023, "days_cur
 def test_india_nra_package_uses_official_forms():
     res, doc = _pkg(*INDIA)
     cover = doc[0].get_text()
-    assert "SYNTHETIC TEST PREVIEW - DO NOT FILE" in cover
-    assert "Where and when to mail" not in cover
-    assert "Sign and date each return" not in cover
+    assert "SYNTHETIC" not in cover and "DO NOT FILE" not in cover
+    text = " ".join(" ".join(p.get_text().split()) for p in doc[:2])   # cover may run to a 2nd page
+    assert "How to file by mail" in text and "Sign and date" in text
+    # 1040-NR: USPS P.O. address plus the Austin street address for couriers
+    assert "Austin, TX 73301-0215" in text and "3651 S IH35, Austin, TX 78741" in text
+    assert "Franchise Tax Board, PO Box 942840" in text and "Sacramento, CA 95827-1500" in text
     titles = [p.get_text()[:120] for p in doc]
     assert any("1040-NR" in t and "Nonresident Alien Income Tax Return" in t for t in titles)
     assert any("SCHEDULE OI" in t for t in titles)
@@ -61,7 +64,9 @@ def test_india_nra_package_uses_official_forms():
     assert "45120" in ca2 and "39414" in ca2          # CA AGI incl. interest; taxable = 45,120 - 5,706
     f8843 = _page(doc, "Statement for Exempt Individuals")
     assert "365" in f8843 and "India" in f8843
-    assert doc.page_count == 1 + 2 + 1 + 2 + 6       # cover, 1040-NR, OI, 8843 (form pages only), 540
+    assert doc.page_count == 1 + 2 + 1 + 2 + 6 + 6   # cover, 1040-NR, OI, 8843, 540, Schedule CA (540)
+    sca = _page(doc, "California Adjustments")
+    assert "120" in sca          # NRA-exempt interest added back in column C (taxable in California)
 
 
 def test_china_treaty_on_line_1k_and_schedule_oi():
@@ -123,7 +128,7 @@ def test_schedule_2_in_package_keeps_supporting_form_warning():
 
 
 def test_api_pdf_endpoint():
-    c = TestClient(app)
+    c = TestClient(app, headers={"X-TaxPrep": "1"})
     tok = {"Authorization": "Bearer " + c.post("/auth/register", json={"email": "pdf@test.com",
            "password": "password123"}).json()["access_token"]}
     rid = c.post("/returns", headers=tok).json()["id"]

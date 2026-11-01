@@ -51,3 +51,67 @@ Public API calls are disabled by default, and Render endpoints are rejected. Aft
 - The connected frontend deployment became Ready. A hosted browser check registered a new synthetic account, created/saved a return, and calculated the wages example: $925 federal and $677 California refunds (the browser example selected the $60 CA renter credit). This differs from the API-only $617 California example by exactly that credit.
 - The public results page still displayed filing directions and a past deadline despite its synthetic-only notice. Removed those directions and changed the PDF action to `Download synthetic preview PDF`; the frontend production build passed. This last UI change still requires deployment verification.
 - Security and tax correctness review remain incomplete. Only synthetic test data is permitted; do not treat this as a filing-ready tax service.
+
+## November 1, 2026: UI redesign
+
+- Restyled the frontend into a "ledger" design: new tokens, fonts, header/footer, hero with an example 1040 card, dashboard cards, and a wizard progress bar with step pills. No API, tax-engine or route changes.
+- Type check and production build passed. Desktop and mobile screenshots (mocked API) in `docs/ui-redesign/`. Details are in `docs/UI_REDESIGN.md`.
+
+## November 1, 2026: tax-year update kit
+
+- Added release status per year (`rules/<year>/meta.yaml`; 2025 = preview) and draft-year gating in the rules loader and API.
+- Added `taxprep/backend/tools/taxyear/` (new_year, check_forms, import_form, pdf_fields, validate, forms manifest), an AI playbook (`.claude/skills/tax-year-update/SKILL.md`, `CLAUDE.md`, `AGENTS.md`) and a monthly form-watch workflow. Details are in `docs/TAX_YEAR_UPDATE_KIT.md`.
+- Backend: 100 passed, 2 skipped. 2026 final forms are not published yet; the watcher will open an issue when they are.
+
+## November 1, 2026: real-filing release (branch `real-filing`)
+
+- **Security for real data:**
+  - invite-only sign-up, sign-in lockout;
+  - HttpOnly cookie sessions with real sign-out, CSRF guard;
+  - whole-return encryption, masked SSNs (taxpayer and dependents);
+  - account deletion, CSP/HSTS;
+  - same-origin `/api` proxy.
+
+  See `docs/SECURITY.md`.
+- **Filing package:**
+  - preview stamp removed;
+  - cover page with mailing addresses (USPS plus UPS/FedEx street addresses, verified on irs.gov, ftb.ca.gov and tax.ny.gov on 2026-11-01), payment notes and due dates;
+  - "Where to mail" card on the results page.
+- **Federal forms added:** Schedules A (1040 and 1040-NR), B, C, D, SE, 1-A, 3, 8812; Forms 8959, 8960, 8833, 1040-V; dependents on Form 1040.
+- **Engine:**
+  - 65+ standard and senior deductions;
+  - Additional Medicare withholding and excess Social Security credits;
+  - 8812 Part II-B;
+  - Schedule A detail;
+  - Schedule 1-A rounding fix (down, per the form).
+- **Website:** new entry screens for all of the above.
+- **Tools and docs:** `tools.taxyear.form_fields` lists a PDF's fields with their line labels; `docs/ADDING_A_STATE.md` plus an engine template.
+- **Verification:**
+  - backend 117 passed, 2 skipped;
+  - frontend build passed;
+  - local browser run (sign-up → return with SSN and a dependent → calculate → PDF → sign-out/in → resume) with no console errors;
+  - filled forms rendered and checked line by line for Schedules A, 3, D, 8812, Form 8959, Form 8960 and the dependents grid.
+- **Remaining:** see "Current coverage" in `taxprep/FIXES.md`.
+
+## November 1, 2026: Forms 8949 and 8863, California and New York additions
+
+- **Federal:**
+  - Form 8949: per-sale entry, boxes A–L including 1099-DA crypto, 11 rows per page; box totals go to Schedule D.
+  - Form 8863: Parts I–III, phase-out ratio to 3 decimals. The under-24 AOTC rule is now asked (line 7) instead of blocked.
+- **California:**
+  - FTB Tax Table up to $100,000, verified against all 1,000 booklet rows.
+  - CA itemized deductions: no state income tax, no SALT cap, high-income limitation.
+  - Schedule CA (540) generated.
+- **New York:**
+  - Published NYS and NYC tax tables, imported by the new `tools/taxyear/ny_tables.py`. The rate schedule alone is off by $1 on some rows.
+  - NYC resident tax, NYC school tax credits (lines 69/69a), Yonkers surcharge, W-2 boxes 18–20.
+  - IT-201 lines 47–58 and 69–74 filled.
+- **Kit:** check_forms accepts year-specific URLs for barcode-dated NY PDFs; the playbook has a NY-tables step.
+- **Verification:**
+  - Backend: 125 passed, 2 skipped.
+  - Frontend: build passed.
+  - Local browser run: sign-up → return → calculate → PDF → sign-out/in → resume, with no errors.
+  - Rendered checks: Forms 8949, 8863, Schedule CA (540), IT-201 page 3.
+- **Still not computed** (listed in `taxprep/FIXES.md` and on the PDF cover):
+  - California: Schedule CA (540NR), CalEITC/YCTC, health-coverage penalty.
+  - New York: NY/NYC EITC and household credits, Empire State child credit, part-year NYC/Yonkers.

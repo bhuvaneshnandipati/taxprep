@@ -5,9 +5,9 @@ Application source is in `taxprep/`.
 
 ## Use as a hosted website
 
-The synthetic-data preview is at https://taxprep-mu.vercel.app, with a separate hosted API and Neon database. Use synthetic test data only. [Website status and limits](WEBSITE.md) document the free Vercel + Neon route. Render is excluded.
+The website is https://taxprep-mu.vercel.app (invite-only; see [security](docs/SECURITY.md)), with a separate hosted API and Neon database. [Website status and limits](WEBSITE.md) document the free Vercel + Neon route. Returns are filed by mail with the generated package; see [what is supported](taxprep/FIXES.md#current-coverage-november-1-2026).
 
-For a complete 2025 status record and a file-by-file path to a future tax-year 2026 release, see the [tax-year handoff](TAX_YEAR_HANDOFF.md).
+To move to a new tax year (e.g. 2026) or new forms, see the [tax-year update kit](docs/TAX_YEAR_UPDATE_KIT.md). For a complete 2025 status record and a file-by-file path to a future tax-year 2026 release, see the [tax-year handoff](TAX_YEAR_HANDOFF.md).
 
 ## Run locally
 
@@ -36,8 +36,8 @@ Tesseract is optional for manual entry and required for image OCR uploads.
 5. Answer the interview and enter income, withholding, deductions, and state details.
    If uploading documents, review the extracted values before applying them.
 6. Select **Calculate my return** and review the results and warnings.
-7. Select **Download filing package (PDF)** to review the synthetic preview output
-   and its checklist. Some supporting attachments may not be generated. The
+7. Select **Download filing package (PDF)**. The first page explains how to sign, assemble
+   and mail it (USPS or UPS/FedEx) and lists anything still to attach. Some supporting attachments may not be generated. The
    application does not e-file; its output is not ready for filing.
 8. Reopen a saved return from the dashboard to continue. After editing income,
    calculate again and download a fresh package.
@@ -58,4 +58,4 @@ See [audit and remaining limitations](taxprep/FIXES.md) and
 
 October 16, 2026: 95 backend checks passed; 2 image-OCR checks skipped without Tesseract. The suite covers engine examples, API authorization, encrypted identifiers, PDF field mapping, and new production-configuration/password/finite-money protections. Frontend production build passed. A local browser E2E using synthetic data verified registration, profile/residency, calculation, PDF download, sign-out/sign-in, and saved-return resume. The $45,000 single-citizen sample produced $925 federal and $617 CA refunds.
 
-The hosted API passed synthetic checks for registration, account isolation, save/resume, calculation, and PDF download. Independent full tax correctness, broader security review, and production readiness remain unverified. See [remaining limitations](taxprep/FIXES.md). Generated PDFs are marked as synthetic test previews, not filing-ready returns.
+November 1, 2026: 117 backend checks passed (2 OCR checks skipped without Tesseract); frontend build passed; a local browser run covered sign-up through PDF download and resume. Generated PDFs are clean filing packages. What is and is not prepared is listed in [current coverage](taxprep/FIXES.md#current-coverage-november-1-2026).

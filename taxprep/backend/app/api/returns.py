@@ -11,7 +11,7 @@ from ..engines.federal import compute_federal, FederalInput
 from ..engines.states.registry import compute_state, StateInput
 from ..engines.interview import next_questions, progress
 from ..engines.rules_loader import load_rules
-from ..core.crypto import protect, reveal
+from ..core.crypto import protect, reveal, mask_id, is_masked, SENSITIVE
 
 router = APIRouter(prefix="/returns", tags=["returns"])
 
@@ -69,8 +69,17 @@ def get_return(rid: int, email: str = Depends(current_user_email), db: Session =
     r = _ret(db, email, rid)
     prof = reveal(dict(r.profile or {}))
     taxpayer = reveal(prof.pop("taxpayer", {}))
+    # Identifiers never go back to the browser in full; the masked value is sent
+    # back unchanged on save and the stored value is kept (see _keep_masked).
+    for d in (prof, taxpayer):
+        for k in SENSITIVE:
+            if d.get(k):
+                d[k] = mask_id(d[k])
+    income = dict(r.income) if r.income else None
+    if income and income.get("dependents"):
+        income["dependents"] = [dict(d, ssn=mask_id(d.get("ssn"))) for d in income["dependents"]]
     out = {"id": r.id, "tax_year": r.tax_year, "status": r.status, "taxpayer": taxpayer,
-           "profile": prof or None, "answers": r.answers or {}, "income": r.income or None,
+           "profile": prof or None, "answers": r.answers or {}, "income": income,
            "residency": None, "next_questions": next_questions(r.answers or {}),
            "progress": progress(r.answers or {}), "result": None}
     if prof:
@@ -97,7 +106,7 @@ def delete_return(rid: int, email: str = Depends(current_user_email), db: Sessio
 def save_profile(rid: int, body: ProfileIn, email: str = Depends(current_user_email), db: Session = Depends(get_db)):
     r = _ret(db, email, rid)
     prof = dict(r.profile or {})
-    prof.update(protect(body.model_dump()))
+    prof.update(protect(_keep_masked(body.model_dump(), prof)))
     r.profile = prof
     res = residency_for(prof, r.tax_year)
     merged = dict(r.answers or {}); merged.update(_profile_answers(prof, res.status))
@@ -121,7 +130,14 @@ def save_answers(rid: int, body: AnswersIn, email: str = Depends(current_user_em
 @router.put("/{rid}/income")
 def save_income(rid: int, body: IncomeIn, email: str = Depends(current_user_email), db: Session = Depends(get_db)):
     r = _ret(db, email, rid)
-    r.income = body.model_dump()
+    new = body.model_dump()
+    old_deps = (r.income or {}).get("dependents") or []
+    for i, d in enumerate(new.get("dependents") or []):   # masked SSN from the browser = unchanged
+        if is_masked(d.get("ssn")):
+            match = next((o for o in old_deps if o.get("first_name") == d["first_name"] and o.get("last_name") == d["last_name"]),
+                         old_deps[i] if i < len(old_deps) else {})
+            d["ssn"] = match.get("ssn", "")
+    r.income = new
     _invalidate(r)
     db.commit()
     return {"ok": True}
@@ -130,9 +146,18 @@ def save_income(rid: int, body: IncomeIn, email: str = Depends(current_user_emai
 @router.put("/{rid}/taxpayer")
 def save_taxpayer(rid: int, body: TaxpayerIn, email: str = Depends(current_user_email), db: Session = Depends(get_db)):
     r = _ret(db, email, rid)
-    prof = dict(r.profile or {}); prof["taxpayer"] = protect(body.model_dump())
+    prof = dict(r.profile or {})
+    prof["taxpayer"] = protect(_keep_masked(body.model_dump(), prof.get("taxpayer") or {}))
     r.profile = prof; db.commit()
     return {"ok": True}
+
+
+def _keep_masked(new: dict, old: dict) -> dict:
+    """A masked identifier coming back from the browser means 'unchanged'."""
+    for k in SENSITIVE:
+        if is_masked(new.get(k)):
+            new[k] = old.get(k, "")
+    return new
 
 
 def _invalidate(r: TaxReturn):
@@ -144,34 +169,77 @@ def run_calculation(r: TaxReturn) -> dict:
     p = r.profile or {}
     inc = IncomeIn(**(r.income or {})).model_dump()
     res = residency_for(p, r.tax_year)
-    if res.status == "dual_status" and any(inc[k] for k in ("interest", "dividends", "capital_gain_lt", "capital_gain_st")):
-        raise ValueError("Dual-status investment income requires period-specific NIIT calculations not supported here.")
     w2s = inc["w2s"]
     state = (inc.get("state") or "CA").upper()
     state_wh = sum(w["state_withholding"] for w in w2s if (w.get("state") or state).upper() == state)
     all_state_tax = sum(w["state_withholding"] for w in w2s) + inc["state_tax_other"]
     med = [w["medicare_wages"] if w["medicare_wages"] is not None else w["wages"] for w in w2s]
-    # Fail closed for known unsupported credits/deductions rather than return a wrong refund.
-    if inc["age"] >= 65:
-        raise ValueError("Age 65+ deductions are not supported in this preview; calculation is blocked.")
-    if inc["education_credit_type"] == "aotc" and inc["tuition_paid"] and inc["age"] < 24:
-        raise ValueError("AOTC eligibility under age 24 requires additional support/parent information not supported here.")
-    if any(w["medicare_tax"] > med[i] * 0.0145 + 1 for i, w in enumerate(w2s)):
-        raise ValueError("Additional Medicare withholding credit is not supported; calculation is blocked.")
-    if sum(w["ss_tax"] for w in w2s) > 176100 * 0.062 + 1:
-        raise ValueError("Excess Social Security withholding credit is not supported; calculation is blocked.")
+    R = load_rules("federal")
+    # Fail closed for the cases that are still not supported, rather than return a wrong refund.
+    stu = inc.get("student") or {}
+    if inc["education_credit_type"] == "aotc" and inc["tuition_paid"] and inc["age"] < 24 and stu.get("refund_restricted") is None:
+        raise ValueError("You are under 24: answer the Form 8863 line 7 question (whether the refundable part of the "
+                         "American Opportunity Credit is restricted for you) in the education section.")
+    if res.status == "dual_status" and any(inc[k] for k in ("interest", "dividends", "capital_gain_lt", "capital_gain_st")) \
+            and sum(w["wages"] for w in w2s) + inc["interest"] + inc["dividends"] > R["niit"]["magi_threshold"].get(inc["filing_status"], 200000):
+        raise ValueError("Dual-status investment income above the Net Investment Income Tax threshold needs a "
+                         "period-by-period NIIT calculation that is not supported here.")
+    if res.status == "nonresident" and inc["age"] >= 65:
+        raise ValueError("Age 65+ rules for nonresident aliens are not supported here.")
+    # Excess Social Security withholding: only when two or more employers together withheld more than
+    # the maximum; one employer over-withholding must refund it themselves (Form 1040 instructions).
+    max_ss = R.get("max_ss_withholding", 10918.20)
+    by_employer = {}
+    for w in w2s:
+        key = (w.get("ein") or w.get("employer") or str(id(w))).strip().lower()
+        by_employer[key] = by_employer.get(key, 0.0) + w["ss_tax"]
+    if any(v > max_ss + 0.5 for v in by_employer.values()):
+        raise ValueError("One employer withheld more Social Security tax than the 2025 maximum "
+                         f"(${max_ss:,.2f}). Ask that employer to refund the excess; it cannot be claimed on the return.")
+    excess_ss = round(max(0.0, sum(by_employer.values()) - max_ss), 2) if len(by_employer) > 1 else 0.0
+    # Totals come from the detail lists when those are filled in.
+    if inc["dependents"]:
+        inc["qualifying_children"] = sum(d["credit"] == "ctc" for d in inc["dependents"])
+        inc["other_dependents"] = sum(d["credit"] == "odc" for d in inc["dependents"])
+    if inc["interest_payers"]:
+        inc["interest"] = sum(p_["amount"] for p_ in inc["interest_payers"])
+    if inc["dividend_payers"]:
+        inc["dividends"] = sum(p_["amount"] for p_ in inc["dividend_payers"])
+    sale_gain = {"short": 0.0, "long": 0.0}
+    for x in inc["sales"]:
+        sale_gain[x["term"]] += x["proceeds"] - x["basis"] + x["adjustment"]
+    st_gain = inc["capital_gain_st"] + inc["st_proceeds"] - inc["st_basis"] - inc["st_loss_carryover"] + sale_gain["short"]
+    lt_gain = inc["capital_gain_lt"] + inc["lt_proceeds"] - inc["lt_basis"] - inc["lt_loss_carryover"] + sale_gain["long"]
+    biz = inc["business"]
+    se_income = inc["se_income"]
+    if biz:
+        biz["meals"] = round(biz["meals_total"] * 0.5, 2)
+        biz["expenses"] = sum(biz[k] for k in ("advertising", "car_truck", "commissions", "contract_labor", "insurance",
+                                               "legal_professional", "office", "supplies", "taxes_licenses", "travel",
+                                               "meals", "utilities", "other_expenses"))
+        biz["gross_income"] = biz["gross_receipts"] - biz["returns"]
+        biz["net_profit"] = biz["gross_income"] - biz["expenses"]
+        se_income = biz["net_profit"]
     fin = FederalInput(
         filing_status=inc["filing_status"],
         wages=sum(w["wages"] for w in w2s),
         medicare_wages=sum(med),
-        fed_withholding=sum(w["fed_withholding"] for w in w2s) + inc["withholding_1099"],
+        fed_withholding=sum(w["fed_withholding"] for w in w2s), withholding_1099=inc["withholding_1099"],
+        medicare_tax_withheld=sum(w["medicare_tax"] for w in w2s), excess_ss_credit=excess_ss,
+        medical_expenses=inc["medical_expenses"], real_estate_tax=inc["real_estate_tax"],
+        mortgage_interest=inc["mortgage_interest"], charitable_noncash=inc["charitable_noncash"],
+        spouse_age=inc["spouse_age"], fica_withheld=sum(w["ss_tax"] + w["medicare_tax"] for w in w2s),
+        foreign_accounts=inc["foreign_accounts"], foreign_trust=inc["foreign_trust"],
+        aotc_refund_restricted=bool(stu.get("refund_restricted")),
+        aotc_ineligible=bool(stu and (stu.get("aotc_claimed_4_years") or not stu.get("half_time", True)
+                                      or stu.get("completed_4_years") or stu.get("felony_drug"))),
         wages_nr_period=inc["wages_nr_period"],
         comp_1042s=inc["comp_1042s"], scholarship_1042s=inc["scholarship_1042s"],
         withholding_1042s=inc["withholding_1042s"],
         interest=inc["interest"], dividends=inc["dividends"],
         qualified_dividends=inc["qualified_dividends"],
-        capital_gain_lt=inc["capital_gain_lt"], capital_gain_st=inc["capital_gain_st"],
-        se_income=inc["se_income"], scholarship_taxable=inc["scholarship_taxable"],
+        capital_gain_lt=lt_gain, capital_gain_st=st_gain,
+        se_income=se_income, scholarship_taxable=inc["scholarship_taxable"],
         student_loan_interest=inc["student_loan_interest"], itemized=inc["itemized"],
         state_income_tax_paid=all_state_tax, charitable=inc["charitable"],
         other_itemized=inc["other_itemized"], qualified_tips=inc["qualified_tips"],
@@ -182,11 +250,15 @@ def run_calculation(r: TaxReturn) -> dict:
         days_present=p.get("days_current", 0), first_entry_year=p.get("first_entry_year", 0),
         estimated_payments=inc["estimated_payments"])
     fed = compute_federal(fin, res)
+    if inc["sales"] and "Schedule D" in fed.schedules:
+        fed.schedules.append("Form 8949")
     st = compute_state(StateInput(
         state=state, withholding=state_wh, full_year_resident=inc["ca_full_year_resident"],
         income_ratio=inc["ca_income_ratio"], state_source_income=inc["state_source_income"],
         dependents=inc["qualifying_children"] + inc["other_dependents"], renter=inc["ca_renter"],
-        itemized=inc["state_itemized"], fed_input=fin), fed)
+        itemized=inc["state_itemized"], fed_input=fin, locality=inc["ny_locality"] if state == "NY" else "",
+        local_withholding=sum(w["local_withholding"] for w in w2s
+                              if inc["ny_locality"] and (w.get("locality") or "").upper().replace(" ", "").startswith(inc["ny_locality"][:3]))), fed)
 
     fica_paid = sum(w["ss_tax"] + w["medicare_tax"] for w in w2s)
     fica_note = (res.status == "nonresident" and res.exempt_days_current > 0
@@ -211,7 +283,9 @@ def run_calculation(r: TaxReturn) -> dict:
             "checklist": checklist, "mailing": mailing,
             "_dependents": inc["qualifying_children"] + inc["other_dependents"],
             "_state_wages": sum(w["state_wages"] or w["wages"] for w in w2s if (w.get("state") or state).upper() == state),
-            "_state_std": std, "_wages_nr_period": inc["wages_nr_period"]}
+            "_state_std": std, "_wages_nr_period": inc["wages_nr_period"],
+            "_payers": "; ".join(dict.fromkeys(w["employer"] for w in w2s if w.get("employer"))),
+            "_income": inc, "_fed_input": dict(fin.__dict__)}
 
 
 @router.post("/{rid}/calculate")
@@ -230,15 +304,27 @@ def calculate(rid: int, email: str = Depends(current_user_email), db: Session = 
 
 
 def mailing_for(fed, st, home_state: str) -> dict:
+    """USPS address (P.O. boxes differ with/without payment) plus the street address
+    for UPS/FedEx/DHL, which cannot deliver to a P.O. box."""
     M = load_rules("mailing")
     owe = fed.lines.get("refund", 0) < 0
     f = M["federal"].get(fed.form)
     if fed.form == "1040":
         f = f.get((home_state or "").upper()) or f["default"]
-    fed_addr = f if isinstance(f, str) else f["payment" if owe else "no_payment"]
-    out = {"federal": fed_addr}
+    out = {"federal": f if isinstance(f, str) else f["payment" if owe else "no_payment"]}
+    pds = M.get("private_delivery") or {}
+    center = (pds.get("federal") or {}).get(fed.form)
+    if isinstance(center, dict):
+        center = center.get((home_state or "").upper())
+    if center:
+        out["federal_private_delivery"] = pds["irs_centers"][center]
     if st.form != "none" and st.state in M["state"]:
         out["state"] = M["state"][st.state]["payment" if st.lines.get("refund", 0) < 0 else "no_payment"]
+        if (pds.get("state") or {}).get(st.state):
+            out["state_private_delivery"] = pds["state"][st.state]
+    out["due_dates"] = M.get("due_dates") or {}
+    out["payment"] = {k: v.replace("{form}", fed.form if k == "federal" else st.form)
+                      for k, v in (M.get("payment") or {}).items()}
     return out
 
 

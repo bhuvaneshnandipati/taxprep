@@ -42,16 +42,14 @@ def test_production_refuses_unsafe_configuration(missing):
 
 
 def test_private_api_responses_are_not_cacheable():
-    response = TestClient(app).get('/health')
+    response = TestClient(app, headers={"X-TaxPrep": "1"}).get('/health')
     assert response.headers['cache-control'] == 'no-store'
     assert response.headers['x-content-type-options'] == 'nosniff'
 
 
 @pytest.mark.parametrize('income,reason', [
-    ({'age': 65}, 'Age 65+'),
-    ({'age': 21, 'education_credit_type': 'aotc', 'tuition_paid': 4000}, 'AOTC'),
-    ({'w2s': [{'wages': 250000, 'medicare_wages': 250000, 'medicare_tax': 4075}]}, 'Medicare'),
-    ({'w2s': [{'wages': 180000, 'ss_tax': 11160}]}, 'Social Security'),
+    ({'age': 21, 'education_credit_type': 'aotc', 'tuition_paid': 4000}, 'line 7 question'),
+    ({'w2s': [{'wages': 180000, 'ss_tax': 11160}]}, 'Social Security'),   # one employer over-withheld
 ])
 def test_unsupported_refund_scenarios_fail_closed(income, reason):
     from app.api.returns import run_calculation
@@ -90,7 +88,7 @@ def test_qss_uses_200k_credit_and_medicare_thresholds():
 def test_applied_document_cannot_be_reopened_and_duplicated():
     from app.db.session import SessionLocal
     from app.db.models import Document
-    client = TestClient(app)
+    client = TestClient(app, headers={"X-TaxPrep": "1"})
     response = client.post('/auth/register', json={'email': 'document.once@example.com', 'password': 'synthetic-password'})
     headers = {'Authorization': 'Bearer ' + response.json()['access_token']}
     rid = client.post('/returns', headers=headers).json()['id']
@@ -107,14 +105,131 @@ def test_applied_document_cannot_be_reopened_and_duplicated():
 
 
 
-def test_every_pdf_page_carries_synthetic_preview_mark():
+def test_pdf_has_no_preview_stamp_and_courier_address():
     from app.api.returns import run_calculation
     from app.pdf.forms import build_package
     from types import SimpleNamespace
     import pymupdf
     row = SimpleNamespace(profile={'citizen': True}, tax_year=2025,
-                          income={'state': 'TX', 'w2s': [{'wages': 45000}]})
+                          income={'state': 'NY', 'w2s': [{'wages': 45000, 'state': 'NY'}]})
     result = run_calculation(row)
-    doc = pymupdf.open('pdf', build_package({'first_name': 'Synthetic', 'last_name': 'Example'}, row.profile, result))
-    assert 'DO NOT FILE' in doc.metadata['title']
-    assert all('SYNTHETIC TEST PREVIEW - DO NOT FILE' in page.get_text() for page in doc)
+    doc = pymupdf.open('pdf', build_package({'first_name': 'Test', 'last_name': 'Example'}, row.profile, result))
+    assert 'DO NOT FILE' not in doc.metadata['title']
+    assert not any('SYNTHETIC' in page.get_text() for page in doc)
+    cover = " ".join(" ".join(p.get_text().split()) for p in doc[:2])
+    assert "333 W. Pershing, Kansas City, MO 64108" in cover          # NY resident 1040 -> Kansas City
+    assert "90 Cohoes Ave, Green Island, NY 12183-1515" in cover
+
+
+# ---------------------------------------------------------------- sessions, lockout, invite-only, CSRF
+def _client():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    return TestClient(app, headers={"X-TaxPrep": "1"})
+
+
+def test_cookie_session_logout_and_csrf():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    c = _client()
+    r = c.post("/auth/register", json={"email": "cookie@test.com", "password": "password123", "full_name": "C"})
+    assert r.status_code == 200
+    set_cookie = r.headers["set-cookie"].lower()
+    assert "taxprep_session=" in set_cookie and "httponly" in set_cookie and "samesite=strict" in set_cookie
+    assert c.get("/returns").status_code == 200                  # cookie alone authenticates
+    # a cross-site form post carries the cookie but cannot add the custom header
+    bare = TestClient(app); bare.cookies.update(c.cookies)
+    assert bare.post("/returns").status_code == 403
+    assert c.post("/auth/logout").status_code == 200
+    assert c.get("/returns").status_code == 401                  # session is gone server-side
+
+
+def test_login_lockout():
+    from app.core.config import settings
+    c = _client()
+    c.post("/auth/register", json={"email": "lock@test.com", "password": "password123", "full_name": "L"})
+    for _ in range(settings.MAX_FAILED_PER_EMAIL):
+        assert c.post("/auth/login", data={"username": "lock@test.com", "password": "wrong-pass"}).status_code == 401
+    # even the right password is refused while locked
+    assert c.post("/auth/login", data={"username": "lock@test.com", "password": "password123"}).status_code == 429
+
+
+def test_invite_only_registration(monkeypatch):
+    from app.core.config import settings
+    c = _client()
+    monkeypatch.setattr(settings, "PRODUCTION", True)
+    monkeypatch.setattr(settings, "REGISTRATION_EMAILS", [])
+    assert c.post("/auth/register", json={"email": "x@test.com", "password": "password123"}).status_code == 403
+    monkeypatch.setattr(settings, "REGISTRATION_EMAILS", ["family@test.com"])
+    assert c.post("/auth/register", json={"email": "y@test.com", "password": "password123"}).status_code == 403
+    assert c.post("/auth/register", json={"email": "Family@test.com", "password": "password123"}).status_code == 200
+
+
+def test_idle_session_expires(monkeypatch):
+    from app.core.config import settings
+    c = _client()
+    tok = c.post("/auth/register", json={"email": "idle@test.com", "password": "password123"}).json()["access_token"]
+    monkeypatch.setattr(settings, "SESSION_IDLE_MINUTES", -1)
+    assert c.get("/returns", headers={"Authorization": f"Bearer {tok}"}).status_code == 401
+
+
+def test_delete_account_removes_everything():
+    from app.db.session import SessionLocal
+    from app.db.models import User, TaxReturn
+    c = _client()
+    c.post("/auth/register", json={"email": "gone@test.com", "password": "password123"})
+    rid = c.post("/returns").json()["id"]
+    assert c.delete("/auth/account").status_code == 200
+    db = SessionLocal()
+    assert db.query(User).filter_by(email="gone@test.com").first() is None
+    assert db.query(TaxReturn).get(rid) is None
+    db.close()
+
+
+def _calc(profile, income):
+    from app.api.returns import run_calculation
+    from types import SimpleNamespace
+    return run_calculation(SimpleNamespace(profile=profile, income=income, tax_year=2025))["federal"]["lines"]
+
+
+def test_age_65_standard_and_senior_deduction():
+    # single, 66, $45,000 wages: std 15,750 + 2,000 (65+) = 17,750; Schedule 1-A senior $6,000 (MAGI < $75k)
+    L = _calc({'citizen': True}, {'age': 66, 'w2s': [{'wages': 45000}]})
+    assert L['deduction'] == 17750 and L['sched1a_senior'] == 6000
+    assert L['taxable_income'] == 21250
+    assert L['tax'] == 2315          # Tax Table band 21,250-21,300: 1,192.50 + 12% x 9,350 = 2,314.50
+
+
+def test_senior_deduction_phaseout():
+    # MAGI 100,000: 6,000 - 6% x 25,000 = 4,500
+    L = _calc({'citizen': True}, {'age': 70, 'w2s': [{'wages': 100000}]})
+    assert L['sched1a_senior'] == 4500
+
+
+def test_additional_medicare_withholding_credit():
+    # box 6 = 1.45% x 250,000 + 0.9% x 50,000 = 4,075 -> 450 extra withheld offsets the 450 tax
+    L = _calc({'citizen': True}, {'w2s': [{'wages': 250000, 'medicare_wages': 250000, 'medicare_tax': 4075}]})
+    assert L['addl_medicare'] == 450 and L['addl_medicare_withheld'] == 450
+    assert L['withholding_other'] == 450
+
+
+def test_excess_social_security_two_employers():
+    w = [{'employer': 'A', 'wages': 100000, 'ss_tax': 6200}, {'employer': 'B', 'wages': 100000, 'ss_tax': 6200}]
+    L = _calc({'citizen': True}, {'w2s': w})
+    assert L['excess_ss_credit'] == 1482     # 12,400 - 10,918.20 = 1,481.80
+    assert L['sch3_refundable'] == 1482
+
+
+def test_tips_phaseout_rounds_down():
+    # MAGI 151,999 -> (1,999 / 1,000) rounded down = 1 -> reduce by $100 (not $200)
+    L = _calc({'citizen': True}, {'w2s': [{'wages': 151999}], 'qualified_tips': 5000})
+    assert L['sched1a_tips'] == 4900
+
+
+def test_schedule_a_detail():
+    # medical 10,000 - 7.5% x 100,000 = 2,500; SALT 6,000 + 4,000; mortgage 12,000; gifts 1,000 + 500
+    L = _calc({'citizen': True}, {'w2s': [{'wages': 100000, 'state_withholding': 6000}], 'medical_expenses': 10000,
+                                  'real_estate_tax': 4000, 'mortgage_interest': 12000, 'charitable': 1000,
+                                  'charitable_noncash': 500})
+    assert L['sa_medical'] == 2500 and L['salt_deduction'] == 10000
+    assert L['sa_total'] == 2500 + 10000 + 12000 + 1500 and L['deduction_type'] == 'itemized'

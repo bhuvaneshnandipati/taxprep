@@ -96,7 +96,10 @@ class FederalInput:
     # W-2 (sums across all W-2s)
     wages: float = 0.0                    # box 1
     medicare_wages: float | None = None   # box 5 (defaults to box 1)
-    fed_withholding: float = 0.0          # box 2 (+ 1099 box 4 withholding)
+    fed_withholding: float = 0.0          # W-2 box 2 (Form 1040 line 25a)
+    withholding_1099: float = 0.0         # 1099 box 4 (line 25b)
+    medicare_tax_withheld: float = 0.0    # W-2 box 6 total (Form 8959 Part V)
+    excess_ss_credit: float = 0.0         # Schedule 3 line 11 (computed from W-2 box 4 by employer)
     wages_nr_period: float = 0.0          # dual-status: part of box 1 earned before residency start
     # Form 1042-S
     comp_1042s: float = 0.0               # treaty-exempt compensation reported on 1042-S (codes 17-20)
@@ -116,7 +119,17 @@ class FederalInput:
     itemized: float = 0.0                 # legacy: total itemized deductions already computed
     state_income_tax_paid: float = 0.0    # Schedule A line 5a (state withholding + payments)
     charitable: float = 0.0
-    other_itemized: float = 0.0           # mortgage interest etc. (residents)
+    other_itemized: float = 0.0           # Schedule A line 16 "other" items from the instructions' list
+    medical_expenses: float = 0.0         # Schedule A line 1 (before the 7.5% of AGI floor)
+    real_estate_tax: float = 0.0          # Schedule A line 5b
+    mortgage_interest: float = 0.0        # Schedule A line 8a (Form 1098)
+    charitable_noncash: float = 0.0       # Schedule A line 12
+    spouse_age: int = 0                   # MFJ only; 0 = unknown
+    fica_withheld: float = 0.0            # W-2 boxes 4 + 6 (Schedule 8812 Part II-B)
+    aotc_refund_restricted: bool = False  # Form 8863 line 7 box (under-24 student rule)
+    aotc_ineligible: bool = False         # any "Yes" on Form 8863 lines 23, 25, 26 or "No" on 24
+    foreign_accounts: bool = False        # Schedule B Part III
+    foreign_trust: bool = False
     qualified_tips: float = 0.0           # Schedule 1-A
     qualified_overtime: float = 0.0       # Schedule 1-A (FLSA premium portion only)
     has_ssn: bool = True
@@ -242,7 +255,9 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
                   f"${-net_cg - cl_limit:,.0f} carries forward.")
     pref_gain = max(0.0, min(lt, net_cg))         # net capital gain eligible for 0/15/20% rates
     if st or lt:
-        sched += ["Schedule D", "Form 8949"]
+        sched.append("Schedule D")
+    if not is_nra and (interest > 1500 or dividends > 1500 or inp.foreign_accounts or inp.foreign_trust):
+        sched.append("Schedule B")
 
     # ---------------- self-employment ------------------------------------------------------
     se = inp.se_income
@@ -281,17 +296,26 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
 
     # ---------------- deductions -----------------------------------------------------------
     std = R["standard_deduction"][fs]
+    seniors = int(inp.age >= 65) + int(fs == "mfj" and inp.spouse_age >= 65)
+    if seniors and mode == "resident":
+        add = R["additional_std_deduction_65_blind"][fs] * seniors
+        std += add
+        ex.append(f"Standard deduction includes ${add:,.0f} for age 65 or older.")
     salt_cfg = R["salt_cap"]
     salt_cap = salt_cfg["cap"][fs]
     over = max(0.0, agi - salt_cfg["phase_down_magi"][fs])
     salt_cap = max(salt_cfg["floor"][fs], salt_cap - over * salt_cfg["phase_down_rate"])
-    salt = min(inp.state_income_tax_paid, salt_cap)
-    if is_nra or mode == "dual_status":
-        item = salt + inp.charitable + (inp.other_itemized if mode == "dual_status" else 0.0)
+    salt_paid = inp.state_income_tax_paid + (0.0 if is_nra else inp.real_estate_tax)
+    salt = min(salt_paid, salt_cap)
+    gifts = inp.charitable + inp.charitable_noncash
+    medical = 0.0 if is_nra else max(0.0, inp.medical_expenses - rnd(agi * 0.075))
+    mortgage = 0.0 if is_nra else inp.mortgage_interest
+    if is_nra:
+        item = salt + gifts                                   # Schedule A (Form 1040-NR)
     else:
-        item = salt + inp.charitable + inp.other_itemized
+        item = medical + salt + mortgage + gifts + inp.other_itemized
     item = max(item, inp.itemized)
-    if (item or inp.state_income_tax_paid) and inp.state_income_tax_paid > salt_cap:
+    if salt_paid > salt_cap:
         ex.append(f"State and local tax deduction capped at ${salt_cap:,.0f}.")
 
     if mode == "resident":
@@ -321,13 +345,31 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
             ex.append("Tips/overtime deductions require a Social Security number valid for employment.")
         else:
             jt = fs == "mfj"
-            red = max(0, math.ceil(max(0.0, agi - s1a["phaseout_magi"][fs]) / 1000)) * s1a["phaseout_per_1000"]
+            # Schedule 1-A lines 10-12: excess MAGI / $1,000 rounded DOWN, times $100
+            red = math.floor(max(0.0, agi - s1a["phaseout_magi"][fs]) / 1000) * s1a["phaseout_per_1000"]
             tips_ded = max(0.0, min(inp.qualified_tips, s1a["tips"]["cap_mfj" if jt else "cap"]) - red)
             ot_ded = max(0.0, min(inp.qualified_overtime, s1a["overtime"]["cap_mfj" if jt else "cap"]) - red)
             if tips_ded or ot_ded:
                 sched.append("Schedule 1-A")
                 ex.append(f"Schedule 1-A: qualified tips ${tips_ded:,.0f}, qualified overtime ${ot_ded:,.0f} deducted.")
-    s1a_total = tips_ded + ot_ded
+    senior_ded = senior_self = senior_spouse = 0.0
+    sr = s1a.get("senior")
+    if sr and (inp.age >= 65 or (fs == "mfj" and inp.spouse_age >= 65)):
+        if is_nra:
+            ex.append("Enhanced deduction for seniors is not computed for nonresident aliens.")
+        elif fs == "mfs":
+            ex.append("Enhanced deduction for seniors requires filing jointly if married.")
+        elif not inp.has_ssn:
+            ex.append("Enhanced deduction for seniors requires a valid Social Security number.")
+        else:
+            each = max(0.0, sr["amount"] - max(0.0, agi - sr["phaseout_magi"][fs]) * sr["phaseout_rate"])
+            senior_self = rnd(each) if inp.age >= 65 else 0.0
+            senior_spouse = rnd(each) if (fs == "mfj" and inp.spouse_age >= 65) else 0.0
+            senior_ded = senior_self + senior_spouse
+            if senior_ded:
+                sched.append("Schedule 1-A")
+                ex.append(f"Schedule 1-A enhanced deduction for seniors: ${senior_ded:,.0f}.")
+    s1a_total = tips_ded + ot_ded + senior_ded
 
     taxable = max(0.0, agi - deduction - s1a_total)
 
@@ -341,6 +383,7 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
 
     # ---------------- credits --------------------------------------------------------------
     edu_nonref = edu_ref = 0.0
+    e8863 = {}
     if inp.education_credit_type != "none" and inp.tuition_paid > 0:
         if mode != "resident":
             ex.append("Education credits are not available to nonresident or dual-status aliens "
@@ -349,46 +392,69 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
             ex.append("Education credits are not allowed when married filing separately.")
         else:
             ec = R["education_credits"]
-            rng = ec["magi_phaseout"].get(fs)
-            if inp.education_credit_type == "aotc":
-                base = min(inp.tuition_paid, ec["aotc"]["max_expense_100pct"]) + ec["aotc"]["rate_2nd_tier"] * \
-                    max(0.0, min(inp.tuition_paid - ec["aotc"]["max_expense_100pct"], ec["aotc"]["max_expense_2nd_tier"]))
-                base = _phase(base, agi, rng)
-                edu_ref = rnd(base * ec["aotc"]["refundable_share"])
-                edu_nonref = min(base - edu_ref, tax)
-                ex.append(f"American Opportunity Credit ${base:,.0f}: ${edu_ref:,.0f} refundable, "
-                          f"${edu_nonref:,.0f} applied against tax.")
+            lo, hi = ec["magi_phaseout"].get(fs)
+            # Form 8863 lines 2-6 / 13-17: ratio of (limit - MAGI) to the range, as a decimal to 3 places
+            ratio = 1.0 if agi <= lo else 0.0 if agi >= hi else round((hi - agi) / (hi - lo), 3)
+            kind = inp.education_credit_type
+            if kind == "aotc" and inp.aotc_ineligible:
+                kind = "llc"
+                ex.append("American Opportunity Credit not allowed for this student (Form 8863 lines 23-26); "
+                          "the Lifetime Learning Credit is used instead.")
+            e = {"kind": kind, "ratio": ratio, "limit": hi, "range": hi - lo, "magi": agi, "expenses": inp.tuition_paid}
+            if kind == "aotc":
+                adj = min(inp.tuition_paid, ec["aotc"]["max_expense_100pct"] + ec["aotc"]["max_expense_2nd_tier"])
+                over = max(0.0, adj - ec["aotc"]["max_expense_100pct"])
+                line30 = (ec["aotc"]["max_expense_100pct"] + over * ec["aotc"]["rate_2nd_tier"]) if over else adj
+                line7 = rnd(line30 * ratio)
+                edu_ref = 0.0 if inp.aotc_refund_restricted else rnd(line7 * ec["aotc"]["refundable_share"])
+                line9 = line7 - edu_ref
+                edu_nonref = min(line9, tax)
+                e.update(line27=adj, line28=over, line29=over * ec["aotc"]["rate_2nd_tier"], line30=line30,
+                         line7=line7, line8=edu_ref, line9=line9, line19=edu_nonref)
+                ex.append(f"American Opportunity Credit ${line7:,.0f}: ${edu_ref:,.0f} refundable"
+                          + (" (none: under-24 student rule)" if inp.aotc_refund_restricted else "")
+                          + f", ${edu_nonref:,.0f} applied against tax.")
             else:
-                base = _phase(ec["llc"]["rate"] * min(inp.tuition_paid, ec["llc"]["expense_cap"]), agi, rng)
-                edu_nonref = min(base, tax)
+                line11 = min(inp.tuition_paid, ec["llc"]["expense_cap"])
+                line12 = line11 * ec["llc"]["rate"]
+                line18 = rnd(line12 * ratio)
+                edu_nonref = min(line18, tax)
+                e.update(line10=inp.tuition_paid, line11=line11, line12=line12, line18=line18, line19=edu_nonref)
                 ex.append(f"Lifetime Learning Credit ${edu_nonref:,.0f}.")
+            e8863 = e
             sched += ["Form 8863", "Schedule 3"]
 
     ctc = actc = odc = 0.0
+    s8812 = {}
     kids, deps = inp.qualifying_children, inp.other_dependents
     if (kids or deps) and is_nra:
         ex.append("Child tax credit is generally not available on Form 1040-NR (exceptions exist for residents "
                   "of Canada, Mexico, South Korea and Indian students — not computed here).")
     elif kids or deps:
         cfg = R["child_tax_credit"]
-        gross = kids * cfg["per_child"] + deps * cfg["other_dependent_credit"]
+        line8 = kids * cfg["per_child"] + deps * cfg["other_dependent_credit"]
         po = cfg["phaseout_agi"][fs]
-        if agi > po:
-            reduction = math.ceil((agi - po) / 1000) * cfg["phaseout_rate_per_1000"]
-            gross = max(0.0, gross - reduction)
-            ex.append(f"Child/dependent credits reduced by ${reduction:,.0f} (AGI over ${po:,}).")
-        limit = max(0.0, tax - edu_nonref)
-        allowed = min(gross, limit)
-        child_part = min(gross, kids * cfg["per_child"])
-        odc_part = gross - child_part
-        odc = min(odc_part, allowed)                 # ODC uses the limit first (nonrefundable only)
+        line10 = math.ceil(max(0.0, agi - po) / 1000) * 1000
+        line11 = line10 * cfg["phaseout_rate_per_1000"] / 1000
+        if line11:
+            ex.append(f"Child/dependent credits reduced by ${line11:,.0f} (AGI over ${po:,}).")
+        line12 = max(0.0, line8 - line11)
+        line13 = max(0.0, tax - edu_nonref)               # Credit Limit Worksheet A
+        allowed = min(line12, line13)
+        child_part = min(line12, kids * cfg["per_child"])
+        odc = min(line12 - child_part, allowed)           # ODC uses the limit first (nonrefundable only)
         ctc = allowed - odc
-        unused_ctc = max(0.0, child_part - ctc)
-        if unused_ctc > 0 and kids:
-            earned = wages + max(0.0, se - se_ded)
-            actc = min(unused_ctc, kids * cfg["refundable_max_per_child"],
-                       max(0.0, earned - cfg["earned_income_floor"]) * cfg["refundable_rate"])
-            actc = rnd(actc)
+        line16a = max(0.0, line12 - allowed)
+        line16b = kids * cfg["refundable_max_per_child"]
+        line17 = min(line16a, line16b)
+        earned = wages + max(0.0, se - se_ded)
+        line19 = max(0.0, earned - cfg["earned_income_floor"])
+        line20 = rnd(line19 * cfg["refundable_rate"])
+        actc = rnd(min(line17, line20)) if line17 else 0.0  # Part II-B (3+ children) is applied after EITC
+        s8812 = {"kids": kids, "odc_count": deps, "line5": kids * cfg["per_child"], "line7": deps * cfg["other_dependent_credit"],
+                 "line8": line8, "line9": po, "line10": line10, "line11": line11, "line12": line12, "line13": line13,
+                 "line14": allowed, "line16a": line16a, "line16b": line16b, "line17": line17, "line18a": earned,
+                 "line19": line19, "line20": line20, "line23": inp.fica_withheld + se_ded if kids >= 3 else 0.0}
         sched.append("Schedule 8812")
         ex.append(f"Child tax credit / credit for other dependents ${ctc + odc:,.0f}"
                   + (f"; additional (refundable) child tax credit ${actc:,.0f}." if actc else "."))
@@ -420,6 +486,14 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
                 if k == 0 and not inp.age:
                     warn.append("EIC without children requires age 25-64 at year end — confirm your age.")
 
+    if s8812 and s8812["kids"] >= 3 and s8812["line17"] and s8812["line20"] < s8812["line17"]:
+        line24 = eitc + inp.excess_ss_credit
+        line25 = max(0.0, s8812["line23"] - line24)
+        actc = rnd(min(s8812["line17"], max(s8812["line20"], line25)))
+        s8812.update(line24=line24, line25=line25, line26=max(s8812["line20"], line25))
+    if s8812:
+        s8812["line27"] = actc
+
     # ---------------- other taxes ----------------------------------------------------------
     am = R["additional_medicare"]
     med_wages = inp.medicare_wages if inp.medicare_wages is not None else inp.wages
@@ -441,12 +515,26 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
     if se_tax:
         sched.append("Schedule 2")
 
+    # Form 8959 Part V: Medicare tax withheld above the regular 1.45% is Additional Medicare Tax withholding
+    addl_med_wh = max(0.0, inp.medicare_tax_withheld - rnd(med_wages * 0.0145)) if inp.medicare_tax_withheld else 0.0
+    if addl_med_wh >= 1:
+        sched += ["Form 8959", "Schedule 2"] if addl_med else ["Form 8959"]
+        ex.append(f"Additional Medicare Tax withheld by your employer (Form 8959 line 24): ${addl_med_wh:,.0f}.")
+    else:
+        addl_med_wh = 0.0
+    if inp.excess_ss_credit:
+        sched.append("Schedule 3")
+        ex.append(f"Excess Social Security tax withheld by two or more employers (Schedule 3 line 11): "
+                  f"${inp.excess_ss_credit:,.0f}.")
+
     total_credits = ctc + odc + edu_nonref
     tax_after = max(0.0, tax - total_credits)
     other_taxes = se_tax + addl_med + niit
     total_tax = tax_after + other_taxes + nec_tax
-    wh_total = inp.fed_withholding + inp.withholding_1042s
-    payments = wh_total + inp.estimated_payments + eitc + actc + edu_ref
+    wh_other = inp.withholding_1042s + addl_med_wh            # 1040 line 25c
+    wh_total = inp.fed_withholding + inp.withholding_1099 + wh_other
+    sch3_refundable = inp.excess_ss_credit                     # Schedule 3 line 15 -> 1040 line 31
+    payments = wh_total + inp.estimated_payments + eitc + actc + edu_ref + sch3_refundable
     refund = payments - total_tax
 
     r = rnd
@@ -459,6 +547,21 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
         "total_income": r(total_income), "adj_half_se": r(se_ded), "adj_student_loan": r(sl_ded),
         "adjustments": r(adjustments), "agi": r(agi), "deduction": r(deduction),
         "deduction_type": ded_type, "salt_deduction": r(salt), "charitable": r(inp.charitable),
+        "sa_medical_paid": r(0.0 if is_nra else inp.medical_expenses), "sa_medical": r(medical),
+        "sa_state_income_tax": r(inp.state_income_tax_paid), "sa_real_estate_tax": r(0.0 if is_nra else inp.real_estate_tax),
+        "sa_salt_paid": r(salt_paid), "sa_mortgage": r(mortgage), "sa_gifts_cash": r(inp.charitable),
+        "sa_gifts_noncash": r(inp.charitable_noncash), "sa_gifts": r(gifts), "sa_other": r(0.0 if is_nra else inp.other_itemized),
+        "sa_total": r(item), "sched1a_senior": r(senior_ded),
+        "senior_self": r(senior_self), "senior_spouse": r(senior_spouse),
+        "tips_raw": r(inp.qualified_tips), "overtime_raw": r(inp.qualified_overtime), "medicare_wages": r(med_wages),
+        "medicare_tax_withheld": r(inp.medicare_tax_withheld), "addl_medicare_withheld": r(addl_med_wh),
+        "withholding_1099": r(inp.withholding_1099), "withholding_other": r(wh_other),
+        "excess_ss_credit": r(inp.excess_ss_credit), "sch3_refundable": r(sch3_refundable),
+        "magi": r(agi), "net_investment_income": r(inp.interest + inp.dividends + max(0.0, net_cg)) if not is_nra else 0.0,
+        "capital_gain_st": r(st), "capital_gain_lt": r(lt), "se_net_earnings": r(se * R["self_employment"]["net_earnings_factor"]) if se_tax else 0.0,
+        "medicare_se_wages": r(med_se),
+        "e8863": {k: (r(v) if isinstance(v, float) and k != "ratio" else v) for k, v in e8863.items()},
+        "s8812": {k: (r(v) if isinstance(v, float) else v) for k, v in s8812.items()},
         "sched1a_tips": r(tips_ded), "sched1a_overtime": r(ot_ded), "sched1a_total": r(s1a_total),
         "total_deductions": r(deduction + s1a_total), "taxable_income": r(taxable), "tax": r(tax),
         "ctc_odc": r(ctc + odc), "education_credit": r(edu_nonref), "other_credits": r(edu_nonref),

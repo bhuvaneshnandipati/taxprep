@@ -19,7 +19,8 @@ def test_ny_it201():
 def test_ny_hand_calc_60k():
     fed = compute_federal(FederalInput(wages=60000), RES)
     out = compute_state(StateInput(state="NY"), fed)
-    assert out.lines["taxable_income"] == 52000 and out.lines["tax"] == 2695
+    # under $65,000 the published NYS Tax Table applies: row 52,000-52,050 single = 2,697
+    assert out.lines["taxable_income"] == 52000 and out.lines["tax"] == 2697
 
 def test_ny_tax_benefit_recapture():
     fed = compute_federal(FederalInput(wages=130000), RES)
@@ -59,7 +60,7 @@ def test_dual_status_flag():
 def test_admin_rbac_and_endpoints():
     from fastapi.testclient import TestClient
     from app.main import app
-    c = TestClient(app)
+    c = TestClient(app, headers={"X-TaxPrep": "1"})
     user_tok = {"Authorization": "Bearer " + c.post("/auth/register",
                 json={"email": "pleb@test.com", "password": "password123"}).json()["access_token"]}
     # reserved admin email cannot be registered without the setup code (prevents admin takeover)
@@ -84,7 +85,7 @@ def test_admin_rbac_and_endpoints():
 def test_calculate_with_ny():
     from fastapi.testclient import TestClient
     from app.main import app
-    c = TestClient(app)
+    c = TestClient(app, headers={"X-TaxPrep": "1"})
     tok = {"Authorization": "Bearer " + c.post("/auth/register",
            json={"email": "ny@test.com", "password": "password123"}).json()["access_token"]}
     rid = c.post("/returns", headers=tok).json()["id"]

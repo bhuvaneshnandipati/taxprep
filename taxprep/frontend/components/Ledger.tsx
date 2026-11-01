@@ -16,7 +16,7 @@ export type CalcResult = {
              explanations: string[]; warnings: string[]; schedules: string[]; treaty: any };
   state: { state: string; form: string; lines: Record<string, any>; explanations: string[]; warnings?: string[] };
   checklist: string[];
-  mailing: { federal?: string; state?: string };
+  mailing: { federal?: string; state?: string; federal_private_delivery?: string; state_private_delivery?: string };
 } | null;
 
 function Row({ line, desc, val, strong, color }:
@@ -30,7 +30,7 @@ function Row({ line, desc, val, strong, color }:
   );
 }
 
-export const GREEN = "#1E7A4D", RED = "#B3382C";
+export const GREEN = "#0E8A5F", RED = "#C2410C";
 
 export default function Ledger({ result }: { result: CalcResult }) {
   const [open, setOpen] = useState(false);
@@ -89,11 +89,11 @@ export default function Ledger({ result }: { result: CalcResult }) {
       <aside className="hidden lg:block w-[300px] shrink-0 card sticky top-5">{body}</aside>
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-50">
         <button onClick={() => setOpen(!open)}
-          className="w-full px-4 py-3 bg-ink text-white flex justify-between items-center font-mono text-[13px]">
+          className="w-full px-4 py-3 bg-night text-white flex justify-between items-center font-mono text-[13px]">
           <span>FED {F.refund >= 0 ? "REFUND" : "OWED"} {fmt(Math.abs(F.refund))}{result.state.form !== "none" ? ` · ${result.state.state} ${fmt(Math.abs(C.refund))}` : ""}</span>
           <span>{open ? "▾ hide" : "▴ form lines"}</span>
         </button>
-        {open && <div className="bg-white border-t-[1.5px] border-rule p-4 max-h-[55vh] overflow-y-auto">{body}</div>}
+        {open && <div className="bg-surface border-t border-rule p-4 max-h-[55vh] overflow-y-auto">{body}</div>}
       </div>
     </>
   );

@@ -1,0 +1,11 @@
+# Release state for this tax year's rule pack. Read by app/engines/rules_loader.py
+# and tools/taxyear. Status meanings:
+#   draft    - being prepared; hidden from the API unless ALLOW_DRAFT_TAX_YEARS=1
+#   preview  - complete enough for synthetic-data testing; real data NOT allowed
+#   released - independently reviewed and approved for real returns
+year: 2025
+status: preview
+sources_ledger: SOURCES.md
+templates_dir: app/pdf/templates/2025
+notes: >
+  Synthetic-data preview. See TAX_YEAR_HANDOFF.md "Release blockers for real 2025 returns".

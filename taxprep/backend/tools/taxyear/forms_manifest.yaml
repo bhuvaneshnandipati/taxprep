@@ -1,0 +1,247 @@
+# Official fill-in PDFs the app fills. `template` is the file name the code
+# expects in app/pdf/templates/<year>/ (see app/pdf/official.py).
+# `undated: true` marks forms revised only occasionally (no tax year printed);
+# the newest revision is accepted for any year.
+# `url` uses {year} for the tax year. IRS "current" URLs always serve the
+# newest revision, so tools/taxyear/check_forms.py reads the PDF to find which
+# tax year it is. `prior_url` is where the IRS archives it after the season.
+forms:
+  - id: f1040
+    agency: IRS
+    title: Form 1040
+    template: f1040.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040--{year}.pdf
+    used_in: official.py (federal resident return)
+  - id: f1040s1
+    agency: IRS
+    title: Schedule 1 (Form 1040)
+    template: f1040s1.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040s1.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040s1--{year}.pdf
+    used_in: official.py
+  - id: f1040s2
+    agency: IRS
+    title: Schedule 2 (Form 1040)
+    template: f1040s2.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040s2.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040s2--{year}.pdf
+    used_in: official.py
+  - id: f1040nr
+    agency: IRS
+    title: Form 1040-NR
+    template: f1040nr.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040nr.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040nr--{year}.pdf
+    used_in: official.py (nonresident alien return)
+  - id: f1040nrn
+    agency: IRS
+    title: Schedule NEC (Form 1040-NR)
+    template: f1040nrn.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040nrn.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040nrn--{year}.pdf
+    used_in: official.py
+  - id: f1040nro
+    agency: IRS
+    title: Schedule OI (Form 1040-NR)
+    template: f1040nro.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040nro.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040nro--{year}.pdf
+    used_in: official.py
+  - id: f8843
+    agency: IRS
+    title: Form 8843
+    template: f8843.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f8843.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f8843--{year}.pdf
+    used_in: official.py
+  - id: ca540
+    agency: FTB
+    title: California Form 540
+    template: "{year}-540.pdf"
+    url: https://www.ftb.ca.gov/forms/{year}/{year}-540.pdf
+    used_in: official.py (CA resident)
+  - id: ca540nr
+    agency: FTB
+    title: California Form 540NR
+    template: "{year}-540nr.pdf"
+    url: https://www.ftb.ca.gov/forms/{year}/{year}-540nr.pdf
+    used_in: official.py (CA nonresident / part-year)
+  - id: it201
+    agency: NY
+    title: New York IT-201
+    template: it201_fill_in.pdf
+    url: https://www.tax.ny.gov/pdf/{year}/inc/it201_{year}_fill_in.pdf
+    used_in: official.py (NY resident)
+  - id: it203
+    agency: NY
+    title: New York IT-203
+    template: it203_fill_in.pdf
+    url: https://www.tax.ny.gov/pdf/{year}/inc/it203_{year}_fill_in.pdf
+    used_in: official.py (NY nonresident / part-year)
+  - id: f1040sa
+    agency: IRS
+    title: Schedule A (Form 1040)
+    template: f1040sa.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040sa.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040sa--{year}.pdf
+    used_in: official.py
+  - id: f1040sb
+    agency: IRS
+    title: Schedule B (Form 1040)
+    template: f1040sb.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040sb.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040sb--{year}.pdf
+    used_in: official.py
+  - id: f1040sc
+    agency: IRS
+    title: Schedule C (Form 1040)
+    template: f1040sc.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040sc.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040sc--{year}.pdf
+    used_in: official.py
+  - id: f1040sd
+    agency: IRS
+    title: Schedule D (Form 1040)
+    template: f1040sd.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040sd.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040sd--{year}.pdf
+    used_in: official.py
+  - id: f8949
+    agency: IRS
+    title: Form 8949
+    template: f8949.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f8949.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f8949--{year}.pdf
+    used_in: official.py
+  - id: f1040sse
+    agency: IRS
+    title: Schedule SE (Form 1040)
+    template: f1040sse.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040sse.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040sse--{year}.pdf
+    used_in: official.py
+  - id: f1040s3
+    agency: IRS
+    title: Schedule 3 (Form 1040)
+    template: f1040s3.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040s3.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040s3--{year}.pdf
+    used_in: official.py
+  - id: f1040s8
+    agency: IRS
+    title: Schedule 8812 (Form 1040)
+    template: f1040s8.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040s8.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040s8--{year}.pdf
+    used_in: official.py
+  - id: f8863
+    agency: IRS
+    title: Form 8863
+    template: f8863.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f8863.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f8863--{year}.pdf
+    used_in: official.py
+  - id: f8959
+    agency: IRS
+    title: Form 8959
+    template: f8959.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f8959.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f8959--{year}.pdf
+    used_in: official.py
+  - id: f8960
+    agency: IRS
+    title: Form 8960
+    template: f8960.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f8960.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f8960--{year}.pdf
+    used_in: official.py
+  - id: f8833
+    agency: IRS
+    title: Form 8833
+    template: f8833.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f8833.pdf
+    undated: true        # revised occasionally (Rev. December 2022), not printed per tax year
+    used_in: official.py
+  - id: f1040nra
+    agency: IRS
+    title: Schedule A (Form 1040-NR)
+    template: f1040nra.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040nra.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040nra--{year}.pdf
+    used_in: official.py (nonresident itemized deductions)
+  - id: f1040s1a
+    agency: IRS
+    title: Schedule 1-A (Form 1040)
+    template: f1040s1a.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040s1a.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040s1a--{year}.pdf
+    used_in: official.py
+  - id: f1040v
+    agency: IRS
+    title: Form 1040-V
+    template: f1040v.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040v.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040v--{year}.pdf
+    used_in: official.py
+
+  - id: ca540ca
+    agency: FTB
+    title: California Schedule CA (540)
+    template: "{year}-540-ca.pdf"
+    url: https://www.ftb.ca.gov/forms/{year}/{year}-540-ca.pdf
+    used_in: official.py
+  - id: ca540nrca
+    agency: FTB
+    title: California Schedule CA (540NR)
+    template: "{year}-540nr-ca.pdf"
+    url: https://www.ftb.ca.gov/forms/{year}/{year}-540nr-ca.pdf
+    used_in: official.py
+  - id: ca3514
+    agency: FTB
+    title: California FTB 3514 (CalEITC)
+    template: "{year}-3514.pdf"
+    url: https://www.ftb.ca.gov/forms/{year}/{year}-3514.pdf
+    used_in: official.py
+  - id: ca3853
+    agency: FTB
+    title: California FTB 3853 (health coverage)
+    template: "{year}-3853.pdf"
+    url: https://www.ftb.ca.gov/forms/{year}/{year}-3853.pdf
+    used_in: official.py
+  - id: it201att
+    agency: NY
+    title: New York IT-201-ATT
+    template: "it201att_fill_in.pdf"
+    url: https://www.tax.ny.gov/pdf/{year}/inc/it201att_{year}_fill_in.pdf
+    used_in: official.py
+  - id: it215
+    agency: NY
+    title: New York IT-215 (NY EITC)
+    template: "it215_fill_in.pdf"
+    url: https://www.tax.ny.gov/pdf/{year}/inc/it215_{year}_fill_in.pdf
+    used_in: official.py
+  - id: it196
+    agency: NY
+    title: New York IT-196 (itemized)
+    template: "it196_fill_in.pdf"
+    url: https://www.tax.ny.gov/pdf/{year}/inc/it196_{year}_fill_in.pdf
+    used_in: official.py
+  - id: it203b
+    agency: NY
+    title: New York IT-203-B (allocation)
+    template: "it203b_fill_in.pdf"
+    url: https://www.tax.ny.gov/pdf/{year}/inc/it203b_{year}_fill_in.pdf
+    used_in: official.py
+
+# Instructions and tables to read when updating rule values (not filled by the app).
+references:
+  - IRS annual inflation adjustments (Revenue Procedure for {year}) - search irs.gov newsroom "tax inflation adjustments for tax year {year}"
+  - https://www.irs.gov/forms-pubs/about-form-1040-nr
+  - https://www.irs.gov/publications/p519   # U.S. Tax Guide for Aliens
+  - https://www.irs.gov/publications/p901   # U.S. Tax Treaties
+  - https://www.irs.gov/draft-tax-forms
+  - https://www.ftb.ca.gov/forms/{year}/{year}-540-booklet.html
+  - https://www.ftb.ca.gov/file/personal/tax-calculator-tables-rates.asp
+  - https://www.tax.ny.gov/pdf/{year}/inc/it201i_{year}.pdf
+  - https://www.tax.ny.gov/forms/

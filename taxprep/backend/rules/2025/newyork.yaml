@@ -14,3 +14,22 @@ recapture:
   agi_start: 107650
   phase_in: 50000
   tier1_max_taxable: { single: 215400, mfs: 215400, mfj: 323200, qss: 323200, hoh: 269300 }
+
+# New York City resident tax (IT-201 line 47a). Source: IT-201-I (2025) p. 40 NYC tax rate schedule;
+# below $65,000 the NYC tax table in newyork_tables.yaml is used.
+nyc_brackets:
+  single: [[0,0.03078],[12000,0.03762],[25000,0.03819],[50000,0.03876]]
+  mfs:    [[0,0.03078],[12000,0.03762],[25000,0.03819],[50000,0.03876]]
+  mfj:    [[0,0.03078],[21600,0.03762],[45000,0.03819],[90000,0.03876]]
+  qss:    [[0,0.03078],[21600,0.03762],[45000,0.03819],[90000,0.03876]]
+  hoh:    [[0,0.03078],[14400,0.03762],[30000,0.03819],[60000,0.03876]]
+# NYC school tax credits (IT-201 lines 69 and 69a), IT-201-I (2025) pp. 19-20, full-year residents.
+nyc_school_credit_fixed: { single: 63, mfs: 63, hoh: 63, mfj: 125, qss: 125, income_limit: 250000 }
+nyc_school_credit_rate_reduction:
+  first_bracket: { single: 12000, mfs: 12000, hoh: 14400, mfj: 21600, qss: 21600 }
+  base: { single: 21, mfs: 21, hoh: 25, mfj: 37, qss: 37 }
+  rate_low: 0.00171
+  rate_high: 0.00228
+  income_limit: 500000
+# Yonkers resident income tax surcharge (IT-201 line 55): 16.75% of net NYS tax (IT-201-I 2025 p. 17 worksheet).
+yonkers_resident_rate: 0.1675

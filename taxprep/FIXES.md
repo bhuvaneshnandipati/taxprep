@@ -110,3 +110,25 @@ Primary references used for this focused review:
 - https://www.irs.gov/instructions/i8960 (NIIT, including dual-status)
 
 Security improvements include versioned bcrypt/SHA-256 password hashing, production configuration guards on all supported hosts, restricted CORS, no-store responses, bounded upload reads and validated OCR amounts. Pending release gates include broader authentication abuse controls, session storage, account recovery/verification, secure operations, independent tax review and actual hosted E2E.
+
+## Current coverage (November 1, 2026)
+
+The PDF is a clean filing package: no preview stamp, and a cover page with signing, attachment, mailing (USPS and UPS/FedEx), payment and due-date instructions.
+
+**Forms generated:**
+- Form 1040 (with dependents), 1040-NR and 1040-V
+- Schedules 1, 1-A, 2, 3, A (Form 1040 and Form 1040-NR), B (including the foreign-account/FBAR questions), C, D (1099-B totals), SE, 8812, NEC and OI
+- Forms 8833, 8843, 8959 and 8960
+- CA 540 / 540NR and NY IT-201 / IT-203
+
+**Newly supported:** 65+ standard deduction and senior deduction; Additional Medicare Tax withholding credit; excess Social Security credit (two or more employers); Schedule 8812 Part II-B; itemized detail (medical, real estate tax, mortgage interest, non-cash gifts).
+
+**Still not prepared:** listed on the cover page under "Also attach", or blocked:
+- ~~Form 8863~~: now generated (Parts I-III, one student); the under-24 rule is asked instead of blocked.
+- ~~Form 8949~~: now generated from the sales list (all six boxes per part, including 1099-DA crypto).
+- **Form 8283:** non-cash gifts over $500.
+
+- **California:** Schedule CA (540) and the FTB tax table are now used. Schedule CA (540NR) is not generated (attach it yourself). CalEITC/YCTC and the health-coverage penalty are not computed.
+- **New York:** NYS and NYC tax tables, NYC resident tax, NYC school tax credits and the Yonkers surcharge are now computed (full-year residents). Not computed: part-year NYC/Yonkers (IT-360.1), NY/NYC earned income credits and household credits (IT-215), Empire State child credit (IT-213), recapture above the first tier.
+- **Dual-status:** investment income above the NIIT threshold is blocked. Non-wage income is treated as received in the resident period.
+- **Treaty time limits:** must be confirmed against Pub. 901.

@@ -1,13 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { apiJson, token, downloadPackage, uploadDocument } from "@/lib/api";
+import { apiJson, downloadPackage, uploadDocument } from "@/lib/api";
+import { BrokerTotals, BusinessEditor, DependentsEditor, ForeignAccounts, PayersEditor, SalesEditor, StudentEditor,
+  type Business, type Dependent, type Payer, type Sale, type Student } from "@/components/Details";
 import Ledger, { CalcResult, Residency, GREEN, RED } from "@/components/Ledger";
 import { MoneyInput, YesNo, Field, TextInput } from "@/components/Fields";
 
 type Q = { id: string; section: string; text: string; type: string; options?: string[]; help?: string };
 type W2 = { employer: string; ein: string; wages: number; fed_withholding: number; ss_wages: number; ss_tax: number;
-  medicare_wages: number | null; medicare_tax: number; state: string; state_wages: number; state_withholding: number };
+  medicare_wages: number | null; medicare_tax: number; state: string; state_wages: number; state_withholding: number;
+  local_wages: number; local_withholding: number; locality: string };
 
 const STEPS = ["About you", "Residency", "Interview", "Income", "Results"];
 const TAX_YEAR = 2025;
@@ -18,7 +21,8 @@ const STATES: [string, string][] = [["CA", "California"], ["NY", "New York"]];
 const NO_TAX = ["AK", "FL", "NV", "NH", "SD", "TN", "TX", "WA", "WY"];
 
 const emptyW2 = (state = "CA"): W2 => ({ employer: "", ein: "", wages: 0, fed_withholding: 0, ss_wages: 0, ss_tax: 0,
-  medicare_wages: null, medicare_tax: 0, state, state_wages: 0, state_withholding: 0 });
+  medicare_wages: null, medicare_tax: 0, state, state_wages: 0, state_withholding: 0,
+  local_wages: 0, local_withholding: 0, locality: "" });
 
 const blankTaxpayer = { first_name: "", middle_initial: "", last_name: "", ssn: "", date_of_birth: "", occupation: "",
   phone: "", email: "", address: "", apt: "", city: "", state: "", zip: "", city_state_zip: "",
@@ -42,6 +46,12 @@ const blankIncome = {
   tuition_paid: 0, education_credit_type: "none", qualifying_children: 0, other_dependents: 0,
   estimated_payments: 0, state: "CA", ca_full_year_resident: true, ca_income_ratio: 1,
   state_source_income: null as number | null, state_itemized: 0, ca_renter: false,
+  spouse_age: 0, medical_expenses: 0, real_estate_tax: 0, mortgage_interest: 0, charitable_noncash: 0,
+  dependents: [] as Dependent[], interest_payers: [] as Payer[], dividend_payers: [] as Payer[],
+  foreign_accounts: false, fbar_required: false, foreign_account_countries: "", foreign_trust: false,
+  st_proceeds: 0, st_basis: 0, lt_proceeds: 0, lt_basis: 0, st_loss_carryover: 0, lt_loss_carryover: 0,
+  business: null as Business | null, sales: [] as Sale[], student: null as Student | null,
+  ny_locality: "" as "" | "NYC" | "YONKERS",
 };
 
 export default function ReturnWizard() {
@@ -69,7 +79,6 @@ export default function ReturnWizard() {
 
   /* ---------- load / resume ---------- */
   useEffect(() => {
-    if (!token()) { router.push("/"); return; }
     apiJson(`/returns/${rid}`).then((d) => {
       if (d.taxpayer) setTp({ ...blankTaxpayer, ...d.taxpayer });
       if (d.profile) {
@@ -133,7 +142,7 @@ export default function ReturnWizard() {
   const validate = (): string => {
     if (step === 0) {
       if (!tp.first_name.trim() || !tp.last_name.trim()) return "Enter your first and last name.";
-      if (tp.ssn && !/^\d{3}-?\d{2}-?\d{4}$/.test(tp.ssn)) return "SSN/ITIN must be 9 digits (XXX-XX-XXXX).";
+      if (tp.ssn && !tp.ssn.startsWith("***-**-") && !/^\d{3}-?\d{2}-?\d{4}$/.test(tp.ssn)) return "SSN/ITIN must be 9 digits (XXX-XX-XXXX).";
     }
     if (step === 1) {
       if (!citAns) return "Answer the citizenship question.";
@@ -191,7 +200,7 @@ export default function ReturnWizard() {
         <Field label="First name"><TextInput value={tp.first_name} onChange={(v) => setT({ first_name: v })} /></Field>
         <Field label="Last name"><TextInput value={tp.last_name} onChange={(v) => setT({ last_name: v })} /></Field>
         <Field label="SSN or ITIN" hint="Leave blank if you have neither — you will need to apply for an ITIN (Form W-7) to file a return with income.">
-          <TextInput value={tp.ssn} onChange={(v) => setT({ ssn: v })} placeholder="XXX-XX-XXXX" maxLength={11} /></Field>
+          <TextInput value={tp.ssn} onChange={(v) => setT({ ssn: v })} placeholder="XXX-XX-XXXX" maxLength={11} />{tp.ssn.startsWith("***-**-") && <p className="text-xs text-mute mt-1">Saved and encrypted. Type a new number to replace it.</p>}</Field>
         <Field label="Filing status" hint="Nonresident aliens are limited to single / married filing separately.">
           <select className="inp" value={inc.filing_status} onChange={(e) => setI({ filing_status: e.target.value })}>
             <option value="single">Single</option><option value="mfj">Married filing jointly</option>
@@ -369,6 +378,10 @@ export default function ReturnWizard() {
           {taxState && !inc.ca_full_year_resident && (
             <Field label={`${stName}-source income ($)`} hint={`Income earned in ${stName} or while you lived there (wages for work done there, etc.).`}>
               <MoneyInput value={inc.state_source_income ?? 0} onChange={(v) => setI({ state_source_income: v })} /></Field>)}
+          {inc.state === "NY" && inc.ca_full_year_resident && <Field label="Did you live in New York City or Yonkers all of 2025?" hint="NYC residents pay city income tax and get the NYC school tax credits; Yonkers residents pay a 16.75% surcharge.">
+            <select className="inp" value={inc.ny_locality} onChange={(e) => setI({ ny_locality: e.target.value as "" | "NYC" | "YONKERS" })}>
+              <option value="">Neither</option><option value="NYC">New York City (any of the 5 boroughs)</option><option value="YONKERS">Yonkers</option>
+            </select></Field>}
           {inc.state === "CA" && <Field label="Rented your CA home for 6+ months?"><YesNo value={inc.ca_renter ? "yes" : "no"} onChange={(v) => setI({ ca_renter: v === "yes" })} /></Field>}
           {inc.state === "CA" && <Field label="Health coverage all of 2025?" hint="School insurance counts. Without it California may charge a penalty (Form 540 line 92) — not computed here.">
             <YesNo value={prof.health_coverage ? "yes" : "no"} onChange={async (v) => { setP({ health_coverage: v === "yes" });
@@ -418,6 +431,10 @@ export default function ReturnWizard() {
             <Field label="Box 6 — Medicare tax"><MoneyInput value={w.medicare_tax} onChange={(v) => setW2(i, { medicare_tax: v })} /></Field>
             <Field label="Box 15 — state"><TextInput value={w.state} onChange={(v) => setW2(i, { state: v.toUpperCase().slice(0, 2) })} placeholder={inc.state} /></Field>
             <Field label="Box 17 — state tax withheld"><MoneyInput value={w.state_withholding} onChange={(v) => setW2(i, { state_withholding: v })} /></Field>
+            {inc.state === "NY" && inc.ny_locality && (<>
+              <Field label="Box 19 — local income tax withheld"><MoneyInput value={w.local_withholding} onChange={(v) => setW2(i, { local_withholding: v })} /></Field>
+              <Field label="Box 20 — locality name" hint="As printed, e.g. NYC or YONKERS."><TextInput value={w.locality} onChange={(v) => setW2(i, { locality: v.toUpperCase().slice(0, 20) })} placeholder={inc.ny_locality} /></Field>
+            </>)}
           </div>
         </div>
       ))}
@@ -441,20 +458,31 @@ export default function ReturnWizard() {
             <Field label="Qualified overtime premium (the extra 0.5x only)"><MoneyInput value={inc.qualified_overtime} onChange={(v) => setI({ qualified_overtime: v })} /></Field>
           </>)}
         {(yes("has_interest") || inc.interest > 0) && (
-          <Field label="Interest income (1099-INT box 1)" hint={isNRA ? "Not taxable federally for nonresident aliens, but taxable for state residents." : undefined}>
-            <MoneyInput value={inc.interest} onChange={(v) => setI({ interest: v })} /></Field>)}
+          <>
+          {inc.interest_payers.length === 0 && <Field label="Interest income (1099-INT box 1)" hint={isNRA ? "Not taxable federally for nonresident aliens, but taxable for state residents." : "Or list each payer below (needed on Schedule B when the total is over $1,500)."}>
+            <MoneyInput value={inc.interest} onChange={(v) => setI({ interest: v })} /></Field>}
+          {!isNRA && <PayersEditor title="Interest by payer (Schedule B Part I)" hint="One line per Form 1099-INT. When listed, the total replaces the amount above." max={14}
+            value={inc.interest_payers} onChange={(v) => setI({ interest_payers: v })} />}
+          </>)}
         {(yes("has_dividends") || inc.dividends > 0) && (
           <>
-            <Field label="Ordinary dividends (1099-DIV 1a / 1042-S code 06)"><MoneyInput value={inc.dividends} onChange={(v) => setI({ dividends: v })} /></Field>
+            {inc.dividend_payers.length === 0 && <Field label="Ordinary dividends (1099-DIV 1a / 1042-S code 06)"><MoneyInput value={inc.dividends} onChange={(v) => setI({ dividends: v })} /></Field>}
+            {!isNRA && <PayersEditor title="Dividends by payer (Schedule B Part II)" hint="One line per Form 1099-DIV (box 1a). When listed, the total replaces the amount above." max={15}
+              value={inc.dividend_payers} onChange={(v) => setI({ dividend_payers: v })} />}
             {!isNRA && <Field label="Qualified dividends (1099-DIV 1b)"><MoneyInput value={inc.qualified_dividends} onChange={(v) => setI({ qualified_dividends: v })} /></Field>}
           </>)}
-        {(yes("has_capital_gains") || inc.capital_gain_lt !== 0 || inc.capital_gain_st !== 0) && (
+        {(yes("has_capital_gains") || inc.capital_gain_lt !== 0 || inc.capital_gain_st !== 0 || inc.sales.length > 0 || inc.st_proceeds > 0 || inc.lt_proceeds > 0) && (
           <>
-            <Field label="Net short-term gain or (loss)" hint="Held 1 year or less. Use a minus sign for a loss."><MoneyInput allowNegative value={inc.capital_gain_st} onChange={(v) => setI({ capital_gain_st: v })} /></Field>
-            <Field label="Net long-term gain or (loss)"><MoneyInput allowNegative value={inc.capital_gain_lt} onChange={(v) => setI({ capital_gain_lt: v })} /></Field>
+            {!isNRA && <BrokerTotals inc={inc} setI={setI} />}
+            {!isNRA && <SalesEditor value={inc.sales} onChange={(v) => setI({ sales: v })} />}
+            <Field label={isNRA ? "Net short-term gain or (loss)" : "Other net short-term gain or (loss)"} hint={isNRA ? "Held 1 year or less. Use a minus sign for a loss." : "Only gains not included in the 1099-B totals above."}><MoneyInput allowNegative value={inc.capital_gain_st} onChange={(v) => setI({ capital_gain_st: v })} /></Field>
+            <Field label={isNRA ? "Net long-term gain or (loss)" : "Other net long-term gain or (loss)"}><MoneyInput allowNegative value={inc.capital_gain_lt} onChange={(v) => setI({ capital_gain_lt: v })} /></Field>
           </>)}
         {(yes("has_self_employment") || inc.se_income !== 0) && (
-          <Field label="Self-employment net profit (after expenses)"><MoneyInput allowNegative value={inc.se_income} onChange={(v) => setI({ se_income: v })} /></Field>)}
+          <>
+            <BusinessEditor value={inc.business} onChange={(v) => setI({ business: v })} />
+            {!inc.business && inc.se_income !== 0 && <Field label="Self-employment net profit (after expenses)"><MoneyInput allowNegative value={inc.se_income} onChange={(v) => setI({ se_income: v })} /></Field>}
+          </>)}
         {(yes("has_interest") || yes("has_dividends") || yes("has_self_employment") || inc.withholding_1099 > 0) && (
           <Field label="Federal tax withheld on 1099s"><MoneyInput value={inc.withholding_1099} onChange={(v) => setI({ withholding_1099: v })} /></Field>)}
         {(yes("student_loan") || inc.student_loan_interest > 0) && (
@@ -466,17 +494,30 @@ export default function ReturnWizard() {
               <select className="inp" value={inc.education_credit_type} onChange={(e) => setI({ education_credit_type: e.target.value })}>
                 <option value="none">None</option><option value="aotc">American Opportunity (first 4 years of college)</option><option value="llc">Lifetime Learning</option>
               </select></Field>
+            {inc.education_credit_type !== "none" && <StudentEditor value={inc.student} onChange={(v) => setI({ student: v })}
+              aotc={inc.education_credit_type === "aotc"} under24={inc.age > 0 && inc.age < 24} />}
           </>)}
-        {(yes("has_charity") || inc.charitable > 0) && (
-          <Field label="Gifts to U.S. charities"><MoneyInput value={inc.charitable} onChange={(v) => setI({ charitable: v })} /></Field>)}
+        {(yes("has_charity") || inc.charitable > 0 || inc.charitable_noncash > 0) && (
+          <>
+            <Field label="Gifts to U.S. charities — cash or check"><MoneyInput value={inc.charitable} onChange={(v) => setI({ charitable: v })} /></Field>
+            <Field label="Gifts to U.S. charities — property (non-cash)" hint="Over $500 needs Form 8283, which TaxPrep does not prepare."><MoneyInput value={inc.charitable_noncash} onChange={(v) => setI({ charitable_noncash: v })} /></Field>
+          </>)}
         <Field label="Other state income tax paid" hint="Besides W-2 box 17 (e.g. a prior-year balance paid in 2025). Used as an itemized deduction.">
           <MoneyInput value={inc.state_tax_other} onChange={(v) => setI({ state_tax_other: v })} /></Field>
-        {isResident && <Field label="Other itemized deductions" hint="Mortgage interest, etc. We compare with the standard deduction.">
-          <MoneyInput value={inc.other_itemized} onChange={(v) => setI({ other_itemized: v })} /></Field>}
+        {!isNRA && (
+          <>
+            <Field label="Home mortgage interest (Form 1098 box 1)"><MoneyInput value={inc.mortgage_interest} onChange={(v) => setI({ mortgage_interest: v })} /></Field>
+            <Field label="Property (real estate) tax paid"><MoneyInput value={inc.real_estate_tax} onChange={(v) => setI({ real_estate_tax: v })} /></Field>
+            <Field label="Unreimbursed medical and dental expenses" hint="Only the part above 7.5% of your AGI is deductible."><MoneyInput value={inc.medical_expenses} onChange={(v) => setI({ medical_expenses: v })} /></Field>
+            <Field label="Other itemized deductions" hint="Only items listed for Schedule A line 16 (e.g. gambling losses up to winnings). We compare itemized with the standard deduction.">
+              <MoneyInput value={inc.other_itemized} onChange={(v) => setI({ other_itemized: v })} /></Field>
+          </>)}
         <Field label="2025 estimated tax payments"><MoneyInput value={inc.estimated_payments} onChange={(v) => setI({ estimated_payments: v })} /></Field>
-        {isResident && inc.qualifying_children === 0 && (
-          <Field label="Your age on Dec 31, 2025" hint="Earned income credit without children requires age 25-64.">
-            <MoneyInput integer value={inc.age} onChange={(v) => setI({ age: v })} /></Field>)}
+        <Field label="Your age on Dec 31, 2025" hint="Used for the 65+ deductions and the earned income credit age test.">
+          <MoneyInput integer value={inc.age} onChange={(v) => setI({ age: v })} /></Field>
+        {inc.filing_status === "mfj" && <Field label="Spouse's age on Dec 31, 2025"><MoneyInput integer value={inc.spouse_age} onChange={(v) => setI({ spouse_age: v })} /></Field>}
+        {!isNRA && <ForeignAccounts inc={inc} setI={setI} />}
+        {!isNRA && <DependentsEditor value={inc.dependents} onChange={(v) => setI({ dependents: v })} />}
       </div>
     </>
   );
@@ -504,8 +545,22 @@ export default function ReturnWizard() {
       <button className="btn w-full sm:w-auto mb-2" disabled={busy} onClick={async () => {
         setBusy(true); setErr("");
         try { await downloadPackage(rid, TAX_YEAR); } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
-      }}>{busy ? "Preparing…" : "Download synthetic preview PDF"}</button>
-      <p className="text-xs text-gray-500 mb-8">These are unreviewed test estimates. The PDF contains draft forms for synthetic testing only. Do not sign or file it.</p>
+      }}>{busy ? "Preparing…" : "Download filing package (PDF)"}</button>
+      <p className="text-xs text-gray-500 mb-6">The PDF has the official forms filled in, plus a first page with signing, attachment and mailing instructions (keep that page; don&apos;t mail it).</p>
+      {result?.mailing?.federal && (
+        <div className="card mb-6">
+          <h3 className="font-bold mb-3">Where to mail</h3>
+          {[{ t: `Federal · Form ${F!.form}`, usps: result.mailing.federal, pds: result.mailing.federal_private_delivery },
+            ...(result.mailing.state ? [{ t: `${C!.state} · Form ${C!.form}`, usps: result.mailing.state, pds: result.mailing.state_private_delivery }] : [])].map((m) => (
+            <div key={m.t} className="mb-4 last:mb-0">
+              <div className="lbl">{m.t}</div>
+              <p className="text-sm"><span className="font-semibold">USPS:</span> {m.usps}</p>
+              {m.pds && <p className="text-sm"><span className="font-semibold">UPS / FedEx:</span> {m.pds}</p>}
+            </div>
+          ))}
+          <p className="text-xs text-mute mt-3">UPS and FedEx can&apos;t deliver to P.O. boxes, so they use the street address. Sign every return and attach your W-2s before mailing.</p>
+        </div>
+      )}
       <h3 className="font-bold mb-2">How your tax was calculated</h3>
       <div className="card mb-6 space-y-2">
         {[...F!.explanations, ...C!.explanations].map((e, i) => <p key={i} className="text-sm text-gray-600">• {e}</p>)}
@@ -516,18 +571,27 @@ export default function ReturnWizard() {
   const body = [stepAbout, stepResidency, stepInterview, stepIncome, stepResults][step];
 
   return (
-    <div className="max-w-[1060px] mx-auto px-5 pb-24 lg:pb-14">
-      <div className="flex gap-1 flex-wrap pt-4">
-        {STEPS.map((s, i) => (
-          <button key={s} onClick={() => (i < step || (i === 4 && result)) && setStep(i)}
-            className={`px-3 py-1.5 text-xs font-mono rounded ${i === step ? "bg-formblue text-white font-bold" : i < step ? "text-formblue" : "text-gray-400"}`}>
-            {i + 1} {s}
-          </button>
-        ))}
-        <a href="/dashboard" className="ml-auto px-3 py-1.5 text-xs font-mono text-gray-500">← All returns</a>
+    <div className="max-w-6xl mx-auto px-5 pb-24 lg:pb-14">
+      <div className="pt-5">
+        <div className="flex items-center justify-between mb-3">
+          <a href="/dashboard" className="text-sm text-mute hover:text-ink">← All returns</a>
+          <span className="font-mono text-[11px] text-mute">STEP {step + 1} / {STEPS.length}</span>
+        </div>
+        <div className="h-1.5 rounded-full bg-hair overflow-hidden mb-3" aria-hidden="true">
+          <div className="h-full bg-formblue rounded-full transition-all duration-500" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
+        </div>
+        <ol className="flex gap-1.5 flex-wrap">
+          {STEPS.map((s, i) => (
+            <li key={s}><button onClick={() => (i < step || (i === 4 && result)) && setStep(i)} aria-current={i === step ? "step" : undefined}
+              className={`flex items-center gap-2 pl-1 pr-3 py-1 rounded-full text-[13px] border transition ${i === step ? "bg-ink text-white border-ink" : i < step ? "bg-surface border-hair text-ink hover:border-ink" : "border-transparent text-gray-400"}`}>
+              <span className={`grid place-items-center w-6 h-6 rounded-full font-mono text-[11px] ${i === step ? "bg-marker text-ink" : i < step ? "bg-refund text-white" : "bg-hair text-gray-500"}`}>{i < step ? "✓" : i + 1}</span>
+              {s}
+            </button></li>
+          ))}
+        </ol>
       </div>
       <div className="flex gap-6 items-start pt-5">
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 card p-5 sm:p-8">
           {body}
           {err && <p className="text-sm text-owe mt-4">{err}</p>}
           {step < 4 && (
