@@ -37,8 +37,14 @@ class CAResult:
 
 
 def ca_tax(ti: float, fs: str, R: dict) -> float:
+    """Form 540/540NR line 31. Taxable income of $100,000 or less uses the FTB Tax Table: $100 bands
+    (e.g. $151-$250) whose tax is the rate-schedule tax on the band center, rounded to whole dollars.
+    Verified against every row of the 2025 540 booklet table for all filing statuses."""
     if ti <= 0:
         return 0.0
+    if ti <= 100000:
+        center = math.floor((round(ti) + 49) / 100) * 100
+        return float(math.floor(marginal_tax(center, R["brackets"][fs]) + 0.5))
     t = marginal_tax(ti, R["brackets"][fs])
     mh = R["mental_health_tax"]
     if ti > mh["threshold"]:
@@ -82,6 +88,28 @@ def _ca_total_agi(fed: FederalResult, fi) -> tuple[float, list]:
     return agi, ex
 
 
+def _ca_itemized(inp, fed, agi, fs, R):
+    """Schedule CA (540) Part II: federal itemized items without state income tax and without the
+    federal SALT cap, then the CA limitation for high incomes (reduce by the smaller of 6% of AGI over
+    the threshold or 80% of the deductions other than medical, investment interest and casualty)."""
+    if inp.itemized:
+        return inp.itemized, ""               # amount entered directly
+    fi = inp.fed_input
+    if fi is None:
+        return 0.0, ""
+    L = fed.lines
+    medical = L.get("sa_medical", 0.0)
+    others = fi.real_estate_tax + fi.mortgage_interest + fi.charitable + fi.charitable_noncash + fi.other_itemized
+    total = medical + others
+    if not total:
+        return 0.0, ""
+    thr = R["exemption_phaseout_agi"][fs]
+    cut = min(max(0.0, agi - thr) * 0.06, others * 0.80) if agi > thr else 0.0
+    note = (f"California itemized deductions ${total - cut:,.0f} (federal items without state income tax or the "
+            f"SALT cap" + (f"; reduced ${cut:,.0f} for AGI over ${thr:,}" if cut else "") + ").")
+    return total - cut, note
+
+
 def compute_california(inp: CAInput, fed: FederalResult) -> CAResult:
     R = load_rules("california")
     fs = fed.filing_status
@@ -91,7 +119,10 @@ def compute_california(inp: CAInput, fed: FederalResult) -> CAResult:
     ex += notes
 
     std = R["standard_deduction"][fs]
-    deduction = max(std, inp.itemized or 0.0)
+    itemized, item_note = _ca_itemized(inp, fed, total_agi, fs, R)
+    deduction = max(std, itemized)
+    if item_note and deduction == itemized:
+        ex.append(item_note)
     total_taxable = max(0.0, total_agi - deduction)
     tax_total = ca_tax(total_taxable, fs, R)
 

@@ -209,3 +209,20 @@ def test_lifetime_learning_phaseout_ratio():
     L = run_calculation(_R({"citizen": True}, {"state": "TX", "w2s": [{"wages": 85000}], "tuition_paid": 12000,
                                                 "education_credit_type": "llc"}))["federal"]["lines"]
     assert L["e8863"]["ratio"] == 0.5 and L["education_credit"] == 1000
+
+
+def test_ca_tax_table_rows_from_booklet():
+    # 2025 Form 540 booklet tax table row 99,851-99,950: single 5,729; joint 3,064; head of household 3,701
+    from app.engines.california import ca_tax
+    from app.engines.rules_loader import load_rules
+    R = load_rules("california")
+    assert ca_tax(99900, "single", R) == 5729 and ca_tax(99900, "mfj", R) == 3064 and ca_tax(99900, "hoh", R) == 3701
+    assert ca_tax(150, "single", R) == 1 and ca_tax(151, "single", R) == 2       # $100 band edges
+
+
+def test_ca_itemized_without_state_tax_or_cap():
+    from app.api.returns import run_calculation
+    inc = {"state": "CA", "w2s": [{"wages": 150000, "state": "CA", "state_withholding": 9000}],
+           "real_estate_tax": 12000, "mortgage_interest": 20000, "charitable": 2000}
+    out = run_calculation(_R({"citizen": True}, inc))
+    assert out["state"]["lines"]["deduction"] == 34000      # 12,000 + 20,000 + 2,000; no CA income tax
