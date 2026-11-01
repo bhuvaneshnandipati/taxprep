@@ -5,7 +5,7 @@ Application source is in `taxprep/`.
 
 ## Use as a hosted website
 
-The synthetic-data preview is at https://taxprep-mu.vercel.app, with a separate hosted API and Neon database. Use synthetic test data only. [Website status and limits](WEBSITE.md) document the free Vercel + Neon route. Render is excluded.
+The website is https://taxprep-mu.vercel.app (invite-only; see [security](docs/SECURITY.md)), with a separate hosted API and Neon database. [Website status and limits](WEBSITE.md) document the free Vercel + Neon route. Returns are filed by mail with the generated package; see [what is supported](taxprep/FIXES.md#current-coverage-november-1-2026).
 
 To move to a new tax year (e.g. 2026) or new forms, see the [tax-year update kit](docs/TAX_YEAR_UPDATE_KIT.md). For a complete 2025 status record and a file-by-file path to a future tax-year 2026 release, see the [tax-year handoff](TAX_YEAR_HANDOFF.md).
 
@@ -36,8 +36,8 @@ Tesseract is optional for manual entry and required for image OCR uploads.
 5. Answer the interview and enter income, withholding, deductions, and state details.
    If uploading documents, review the extracted values before applying them.
 6. Select **Calculate my return** and review the results and warnings.
-7. Select **Download filing package (PDF)** to review the synthetic preview output
-   and its checklist. Some supporting attachments may not be generated. The
+7. Select **Download filing package (PDF)**. The first page explains how to sign, assemble
+   and mail it (USPS or UPS/FedEx) and lists anything still to attach. Some supporting attachments may not be generated. The
    application does not e-file; its output is not ready for filing.
 8. Reopen a saved return from the dashboard to continue. After editing income,
    calculate again and download a fresh package.

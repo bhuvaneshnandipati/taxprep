@@ -62,3 +62,33 @@ Public API calls are disabled by default, and Render endpoints are rejected. Aft
 - Added release status per year (`rules/<year>/meta.yaml`; 2025 = preview) and draft-year gating in the rules loader and API.
 - Added `taxprep/backend/tools/taxyear/` (new_year, check_forms, import_form, pdf_fields, validate, forms manifest), an AI playbook (`.claude/skills/tax-year-update/SKILL.md`, `CLAUDE.md`, `AGENTS.md`) and a monthly form-watch workflow. Details are in `docs/TAX_YEAR_UPDATE_KIT.md`.
 - Backend: 100 passed, 2 skipped. 2026 final forms are not published yet; the watcher will open an issue when they are.
+
+## November 1, 2026: real-filing release (branch `real-filing`)
+
+- **Security for real data:**
+  - invite-only sign-up, sign-in lockout;
+  - HttpOnly cookie sessions with real sign-out, CSRF guard;
+  - whole-return encryption, masked SSNs (taxpayer and dependents);
+  - account deletion, CSP/HSTS;
+  - same-origin `/api` proxy.
+
+  See `docs/SECURITY.md`.
+- **Filing package:**
+  - preview stamp removed;
+  - cover page with mailing addresses (USPS plus UPS/FedEx street addresses, verified on irs.gov, ftb.ca.gov and tax.ny.gov on 2026-11-01), payment notes and due dates;
+  - "Where to mail" card on the results page.
+- **Federal forms added:** Schedules A (1040 and 1040-NR), B, C, D, SE, 1-A, 3, 8812; Forms 8959, 8960, 8833, 1040-V; dependents on Form 1040.
+- **Engine:**
+  - 65+ standard and senior deductions;
+  - Additional Medicare withholding and excess Social Security credits;
+  - 8812 Part II-B;
+  - Schedule A detail;
+  - Schedule 1-A rounding fix (down, per the form).
+- **Website:** new entry screens for all of the above.
+- **Tools and docs:** `tools.taxyear.form_fields` lists a PDF's fields with their line labels; `docs/ADDING_A_STATE.md` plus an engine template.
+- **Verification:**
+  - backend 117 passed, 2 skipped;
+  - frontend build passed;
+  - local browser run (sign-up → return with SSN and a dependent → calculate → PDF → sign-out/in → resume) with no console errors;
+  - filled forms rendered and checked line by line for Schedules A, 3, D, 8812, Form 8959, Form 8960 and the dependents grid.
+- **Remaining:** see "Current coverage" in `taxprep/FIXES.md`.
