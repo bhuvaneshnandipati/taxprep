@@ -226,3 +226,29 @@ def test_ca_itemized_without_state_tax_or_cap():
            "real_estate_tax": 12000, "mortgage_interest": 20000, "charitable": 2000}
     out = run_calculation(_R({"citizen": True}, inc))
     assert out["state"]["lines"]["deduction"] == 34000      # 12,000 + 20,000 + 2,000; no CA income tax
+
+
+def test_nyc_resident_tax_and_school_credits():
+    from app.api.returns import run_calculation
+    inc = {"state": "NY", "ny_locality": "NYC",
+           "w2s": [{"wages": 60000, "state": "NY", "state_withholding": 2800, "local_withholding": 1700, "locality": "NYC"}]}
+    L = run_calculation(_R({"citizen": True}, inc))["state"]["lines"]
+    # taxable 52,000 single: NYC table row 52,000-52,050 = 1,891; school credits 63 + (21 + 0.228% x 40,000 = 112)
+    assert L["taxable_income"] == 52000 and L["nyc_tax"] == 1891
+    assert L["nyc_school_fixed"] == 63 and L["nyc_school_rr"] == 112
+    assert L["total_tax"] == 2697 + 1891
+    assert L["refund"] == 2800 + 1700 + 63 + 112 - (2697 + 1891)
+
+
+def test_yonkers_surcharge():
+    from app.api.returns import run_calculation
+    L = run_calculation(_R({"citizen": True}, {"state": "NY", "ny_locality": "YONKERS", "w2s": [{"wages": 60000}]}))["state"]["lines"]
+    assert L["yonkers_tax"] == round(2697 * 0.1675)      # 452
+
+
+def test_it201_pdf_has_nyc_lines():
+    inc = {"state": "NY", "ny_locality": "NYC",
+           "w2s": [{"wages": 60000, "state": "NY", "state_withholding": 2800, "local_withholding": 1700, "locality": "NYC"}]}
+    res, doc = _pkg({"citizen": True}, inc)
+    text = " ".join(" ".join(p.get_text().split()) for p in doc)
+    assert "1891" in text and "4588" in text and "1700" in text   # NYC tax, total tax (2,697 + 1,891), NYC withheld

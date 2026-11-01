@@ -19,6 +19,8 @@ class StateInput:
     renter: bool = False
     itemized: float = 0.0                     # state itemized deductions (CA: excludes state income tax)
     fed_input: Any = None                     # FederalInput (needed for CA, which does not follow treaties)
+    locality: str = ""                        # NY full-year residents: "NYC" or "YONKERS"
+    local_withholding: float = 0.0            # W-2 box 19 for that locality
 
 
 @dataclass

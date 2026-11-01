@@ -129,6 +129,6 @@ The PDF is a clean filing package: no preview stamp, and a cover page with signi
 - **Form 8283:** non-cash gifts over $500.
 
 - **California:** Schedule CA (540) and the FTB tax table are now used. Schedule CA (540NR) is not generated (attach it yourself). CalEITC/YCTC and the health-coverage penalty are not computed.
-- **New York:** NYC and Yonkers resident tax, NY EITC and household credit, and recapture above the first tier are not computed.
+- **New York:** NYS and NYC tax tables, NYC resident tax, NYC school tax credits and the Yonkers surcharge are now computed (full-year residents). Not computed: part-year NYC/Yonkers (IT-360.1), NY/NYC earned income credits and household credits (IT-215), Empire State child credit (IT-213), recapture above the first tier.
 - **Dual-status:** investment income above the NIIT threshold is blocked. Non-wage income is treated as received in the resident period.
 - **Treaty time limits:** must be confirmed against Pub. 901.

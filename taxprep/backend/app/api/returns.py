@@ -256,7 +256,9 @@ def run_calculation(r: TaxReturn) -> dict:
         state=state, withholding=state_wh, full_year_resident=inc["ca_full_year_resident"],
         income_ratio=inc["ca_income_ratio"], state_source_income=inc["state_source_income"],
         dependents=inc["qualifying_children"] + inc["other_dependents"], renter=inc["ca_renter"],
-        itemized=inc["state_itemized"], fed_input=fin), fed)
+        itemized=inc["state_itemized"], fed_input=fin, locality=inc["ny_locality"] if state == "NY" else "",
+        local_withholding=sum(w["local_withholding"] for w in w2s
+                              if inc["ny_locality"] and (w.get("locality") or "").upper().replace(" ", "").startswith(inc["ny_locality"][:3]))), fed)
 
     fica_paid = sum(w["ss_tax"] + w["medicare_tax"] for w in w2s)
     fica_note = (res.status == "nonresident" and res.exempt_days_current > 0

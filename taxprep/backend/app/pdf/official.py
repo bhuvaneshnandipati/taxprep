@@ -400,12 +400,21 @@ def ny_it201(year, tp, fed, st, ny_inputs):
          "Line35": m(max(0, L["ny_agi"] - L["deduction"]), False), "Line36": m(L["dependent_exemptions"]),
          "Line37": m(L["taxable_income"], False), "Line38": m(L["taxable_income"], False),
          "Line39": m(L["tax"], False), "Line44": m(L["tax"], False), "Line46": m(L["tax"], False),
-         "Line59": "0", "Line61": m(L["tax"], False), "Line62": m(L["tax"], False),
-         "Line72": m(L["withholding"]), "Line76": m(L["withholding"], False),
+         "Line59": "0", "Line61": m(L["total_tax"], False), "Line62": m(L["total_tax"], False),
+         "Line72": m(L["withholding"]), "Line76": m(L.get("total_payments", L["withholding"]), False),
          "Line77": m(L["overpaid"]), "Line78": m(L["overpaid"]), "Line78b": m(L["overpaid"]),
          "Line80": m(L["owed"]), "TP_occupation": tp.get("occupation", "")}
     if F["sched1_scholarship"]:
         v["18_identify"] = ""
+    loc = L.get("locality", "")
+    if loc == "NYC":
+        v.update({"F1_NYC": "12", "Line47": m(L["taxable_income"], False), "Line47a": m(L["nyc_tax"], False),
+                  "Line49": m(L["nyc_tax"], False), "Line52": m(L["nyc_tax"], False), "Line54": m(L["nyc_tax"], False), "Line58": m(L["nyc_tax"], False),
+                  "Line69": m(L.get("nyc_school_fixed", 0)), "Line69a": m(L.get("nyc_school_rr", 0)),
+                  "Line73": m(L.get("local_withholding", 0))})
+    elif loc == "YONKERS":
+        v.update({"Line55": m(L["yonkers_tax"], False), "Line58": m(L["yonkers_tax"], False),
+                  "Line74": m(L.get("local_withholding", 0))})
     radios = {"Filing_status": _ny_radio(path, "Filing_status", NY_FS[fed["filing_status"]]),
               "34Deduction": "Standard" if L["deduction"] <= ny_inputs.get("std", 0) else "Itemized",
               "Itemized": "yes" if F.get("deduction_type") == "itemized" else "no",

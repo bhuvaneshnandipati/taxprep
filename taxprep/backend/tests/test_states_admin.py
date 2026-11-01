@@ -19,7 +19,8 @@ def test_ny_it201():
 def test_ny_hand_calc_60k():
     fed = compute_federal(FederalInput(wages=60000), RES)
     out = compute_state(StateInput(state="NY"), fed)
-    assert out.lines["taxable_income"] == 52000 and out.lines["tax"] == 2695
+    # under $65,000 the published NYS Tax Table applies: row 52,000-52,050 single = 2,697
+    assert out.lines["taxable_income"] == 52000 and out.lines["tax"] == 2697
 
 def test_ny_tax_benefit_recapture():
     fed = compute_federal(FederalInput(wages=130000), RES)

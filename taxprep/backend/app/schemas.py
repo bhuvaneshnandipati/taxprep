@@ -63,6 +63,9 @@ class W2In(BaseModel):
     state: str = Field(default="", max_length=2)  # box 15
     state_wages: Money = NonNeg              # box 16
     state_withholding: Money = NonNeg        # box 17
+    local_wages: Money = NonNeg              # box 18
+    local_withholding: Money = NonNeg        # box 19
+    locality: str = Field(default="", max_length=20)   # box 20 (e.g. NYC, YONKERS)
 
 
 FilingStatus = Literal["single", "mfj", "mfs", "hoh", "qss"]
@@ -202,6 +205,7 @@ class IncomeIn(BaseModel):
     state_source_income: Optional[Money] = Field(default=None, ge=0)
     state_itemized: Money = NonNeg
     ca_renter: bool = False
+    ny_locality: Literal["", "NYC", "YONKERS"] = ""     # full-year NY residents: city of residence
 
 
 class AnswersIn(BaseModel):

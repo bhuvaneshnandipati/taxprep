@@ -9,7 +9,8 @@ import { MoneyInput, YesNo, Field, TextInput } from "@/components/Fields";
 
 type Q = { id: string; section: string; text: string; type: string; options?: string[]; help?: string };
 type W2 = { employer: string; ein: string; wages: number; fed_withholding: number; ss_wages: number; ss_tax: number;
-  medicare_wages: number | null; medicare_tax: number; state: string; state_wages: number; state_withholding: number };
+  medicare_wages: number | null; medicare_tax: number; state: string; state_wages: number; state_withholding: number;
+  local_wages: number; local_withholding: number; locality: string };
 
 const STEPS = ["About you", "Residency", "Interview", "Income", "Results"];
 const TAX_YEAR = 2025;
@@ -20,7 +21,8 @@ const STATES: [string, string][] = [["CA", "California"], ["NY", "New York"]];
 const NO_TAX = ["AK", "FL", "NV", "NH", "SD", "TN", "TX", "WA", "WY"];
 
 const emptyW2 = (state = "CA"): W2 => ({ employer: "", ein: "", wages: 0, fed_withholding: 0, ss_wages: 0, ss_tax: 0,
-  medicare_wages: null, medicare_tax: 0, state, state_wages: 0, state_withholding: 0 });
+  medicare_wages: null, medicare_tax: 0, state, state_wages: 0, state_withholding: 0,
+  local_wages: 0, local_withholding: 0, locality: "" });
 
 const blankTaxpayer = { first_name: "", middle_initial: "", last_name: "", ssn: "", date_of_birth: "", occupation: "",
   phone: "", email: "", address: "", apt: "", city: "", state: "", zip: "", city_state_zip: "",
@@ -49,6 +51,7 @@ const blankIncome = {
   foreign_accounts: false, fbar_required: false, foreign_account_countries: "", foreign_trust: false,
   st_proceeds: 0, st_basis: 0, lt_proceeds: 0, lt_basis: 0, st_loss_carryover: 0, lt_loss_carryover: 0,
   business: null as Business | null, sales: [] as Sale[], student: null as Student | null,
+  ny_locality: "" as "" | "NYC" | "YONKERS",
 };
 
 export default function ReturnWizard() {
@@ -375,6 +378,10 @@ export default function ReturnWizard() {
           {taxState && !inc.ca_full_year_resident && (
             <Field label={`${stName}-source income ($)`} hint={`Income earned in ${stName} or while you lived there (wages for work done there, etc.).`}>
               <MoneyInput value={inc.state_source_income ?? 0} onChange={(v) => setI({ state_source_income: v })} /></Field>)}
+          {inc.state === "NY" && inc.ca_full_year_resident && <Field label="Did you live in New York City or Yonkers all of 2025?" hint="NYC residents pay city income tax and get the NYC school tax credits; Yonkers residents pay a 16.75% surcharge.">
+            <select className="inp" value={inc.ny_locality} onChange={(e) => setI({ ny_locality: e.target.value as "" | "NYC" | "YONKERS" })}>
+              <option value="">Neither</option><option value="NYC">New York City (any of the 5 boroughs)</option><option value="YONKERS">Yonkers</option>
+            </select></Field>}
           {inc.state === "CA" && <Field label="Rented your CA home for 6+ months?"><YesNo value={inc.ca_renter ? "yes" : "no"} onChange={(v) => setI({ ca_renter: v === "yes" })} /></Field>}
           {inc.state === "CA" && <Field label="Health coverage all of 2025?" hint="School insurance counts. Without it California may charge a penalty (Form 540 line 92) — not computed here.">
             <YesNo value={prof.health_coverage ? "yes" : "no"} onChange={async (v) => { setP({ health_coverage: v === "yes" });
@@ -424,6 +431,10 @@ export default function ReturnWizard() {
             <Field label="Box 6 — Medicare tax"><MoneyInput value={w.medicare_tax} onChange={(v) => setW2(i, { medicare_tax: v })} /></Field>
             <Field label="Box 15 — state"><TextInput value={w.state} onChange={(v) => setW2(i, { state: v.toUpperCase().slice(0, 2) })} placeholder={inc.state} /></Field>
             <Field label="Box 17 — state tax withheld"><MoneyInput value={w.state_withholding} onChange={(v) => setW2(i, { state_withholding: v })} /></Field>
+            {inc.state === "NY" && inc.ny_locality && (<>
+              <Field label="Box 19 — local income tax withheld"><MoneyInput value={w.local_withholding} onChange={(v) => setW2(i, { local_withholding: v })} /></Field>
+              <Field label="Box 20 — locality name" hint="As printed, e.g. NYC or YONKERS."><TextInput value={w.locality} onChange={(v) => setW2(i, { locality: v.toUpperCase().slice(0, 20) })} placeholder={inc.ny_locality} /></Field>
+            </>)}
           </div>
         </div>
       ))}
