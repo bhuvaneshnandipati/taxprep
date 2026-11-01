@@ -53,6 +53,8 @@ Official sources to recheck when final 2026 materials appear: [IRS forms and ins
 
 ## Safe 2026 upgrade order
 
+The steps below are automated where possible by the tax-year update kit: see `docs/TAX_YEAR_UPDATE_KIT.md` and `.claude/skills/tax-year-update/SKILL.md`.
+
 1. Preserve 2025 as a working baseline. Create a `codex/2026-tax-year` branch; do not overwrite `rules/2025` or official 2025 templates. Keep current 2025 returns tagged `tax_year=2025` in the database.
 2. Gather final 2026 IRS, FTB, and NY forms/instructions and any corrections. Build a source ledger in Markdown with the URL, revision date, page/line, new value, reviewer and verification date for each changed rule. If final sources are unavailable, keep 2026 disabled.
 3. Add `rules/2026` and official `templates/2026`; update code-only values and field mappings in the table above. Make frontend and API select the year of each return rather than assuming a global year. Design database migration/backfill before deploying year choice.

@@ -6,3 +6,5 @@ tests
 *.db
 .local-secrets.json
 .env*
+tools
+logs

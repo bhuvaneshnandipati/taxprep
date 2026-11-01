@@ -14,6 +14,8 @@ def years():
 
 @router.get("/rules/{pack}")
 def rules(pack: str, year: int = 2025):
+    if year not in available_years():
+        raise HTTPException(404, f"Tax year {year} is not available")
     try:
         return load_rules(pack, year)
     except FileNotFoundError as e:

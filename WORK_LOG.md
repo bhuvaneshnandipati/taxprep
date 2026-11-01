@@ -51,3 +51,9 @@ Public API calls are disabled by default, and Render endpoints are rejected. Aft
 - The connected frontend deployment became Ready. A hosted browser check registered a new synthetic account, created/saved a return, and calculated the wages example: $925 federal and $677 California refunds (the browser example selected the $60 CA renter credit). This differs from the API-only $617 California example by exactly that credit.
 - The public results page still displayed filing directions and a past deadline despite its synthetic-only notice. Removed those directions and changed the PDF action to `Download synthetic preview PDF`; the frontend production build passed. This last UI change still requires deployment verification.
 - Security and tax correctness review remain incomplete. Only synthetic test data is permitted; do not treat this as a filing-ready tax service.
+
+## November 1, 2026: tax-year update kit
+
+- Added release status per year (`rules/<year>/meta.yaml`; 2025 = preview) and draft-year gating in the rules loader and API.
+- Added `taxprep/backend/tools/taxyear/` (new_year, check_forms, import_form, pdf_fields, validate, forms manifest), an AI playbook (`.claude/skills/tax-year-update/SKILL.md`, `CLAUDE.md`, `AGENTS.md`) and a monthly form-watch workflow. Details are in `docs/TAX_YEAR_UPDATE_KIT.md`.
+- Backend: 100 passed, 2 skipped. 2026 final forms are not published yet; the watcher will open an issue when they are.

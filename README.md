@@ -7,7 +7,7 @@ Application source is in `taxprep/`.
 
 The synthetic-data preview is at https://taxprep-mu.vercel.app, with a separate hosted API and Neon database. Use synthetic test data only. [Website status and limits](WEBSITE.md) document the free Vercel + Neon route. Render is excluded.
 
-For a complete 2025 status record and a file-by-file path to a future tax-year 2026 release, see the [tax-year handoff](TAX_YEAR_HANDOFF.md).
+To move to a new tax year (e.g. 2026) or new forms, see the [tax-year update kit](docs/TAX_YEAR_UPDATE_KIT.md). For a complete 2025 status record and a file-by-file path to a future tax-year 2026 release, see the [tax-year handoff](TAX_YEAR_HANDOFF.md).
 
 ## Run locally
 

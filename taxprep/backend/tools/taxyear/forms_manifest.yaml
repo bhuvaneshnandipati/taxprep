@@ -1,0 +1,91 @@
+# Official fill-in PDFs the app fills. `template` is the file name the code
+# expects in app/pdf/templates/<year>/ (see app/pdf/official.py).
+# `url` uses {year} for the tax year. IRS "current" URLs always serve the
+# newest revision, so tools/taxyear/check_forms.py reads the PDF to find which
+# tax year it is. `prior_url` is where the IRS archives it after the season.
+forms:
+  - id: f1040
+    agency: IRS
+    title: Form 1040
+    template: f1040.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040--{year}.pdf
+    used_in: official.py (federal resident return)
+  - id: f1040s1
+    agency: IRS
+    title: Schedule 1 (Form 1040)
+    template: f1040s1.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040s1.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040s1--{year}.pdf
+    used_in: official.py
+  - id: f1040s2
+    agency: IRS
+    title: Schedule 2 (Form 1040)
+    template: f1040s2.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040s2.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040s2--{year}.pdf
+    used_in: official.py
+  - id: f1040nr
+    agency: IRS
+    title: Form 1040-NR
+    template: f1040nr.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040nr.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040nr--{year}.pdf
+    used_in: official.py (nonresident alien return)
+  - id: f1040nrn
+    agency: IRS
+    title: Schedule NEC (Form 1040-NR)
+    template: f1040nrn.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040nrn.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040nrn--{year}.pdf
+    used_in: official.py
+  - id: f1040nro
+    agency: IRS
+    title: Schedule OI (Form 1040-NR)
+    template: f1040nro.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f1040nro.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f1040nro--{year}.pdf
+    used_in: official.py
+  - id: f8843
+    agency: IRS
+    title: Form 8843
+    template: f8843.pdf
+    url: https://www.irs.gov/pub/irs-pdf/f8843.pdf
+    prior_url: https://www.irs.gov/pub/irs-prior/f8843--{year}.pdf
+    used_in: official.py
+  - id: ca540
+    agency: FTB
+    title: California Form 540
+    template: "{year}-540.pdf"
+    url: https://www.ftb.ca.gov/forms/{year}/{year}-540.pdf
+    used_in: official.py (CA resident)
+  - id: ca540nr
+    agency: FTB
+    title: California Form 540NR
+    template: "{year}-540nr.pdf"
+    url: https://www.ftb.ca.gov/forms/{year}/{year}-540nr.pdf
+    used_in: official.py (CA nonresident / part-year)
+  - id: it201
+    agency: NY
+    title: New York IT-201
+    template: it201_fill_in.pdf
+    url: https://www.tax.ny.gov/pdf/{year}/inc/it201_{year}_fill_in.pdf
+    used_in: official.py (NY resident)
+  - id: it203
+    agency: NY
+    title: New York IT-203
+    template: it203_fill_in.pdf
+    url: https://www.tax.ny.gov/pdf/{year}/inc/it203_{year}_fill_in.pdf
+    used_in: official.py (NY nonresident / part-year)
+
+# Instructions and tables to read when updating rule values (not filled by the app).
+references:
+  - IRS annual inflation adjustments (Revenue Procedure for {year}) - search irs.gov newsroom "tax inflation adjustments for tax year {year}"
+  - https://www.irs.gov/forms-pubs/about-form-1040-nr
+  - https://www.irs.gov/publications/p519   # U.S. Tax Guide for Aliens
+  - https://www.irs.gov/publications/p901   # U.S. Tax Treaties
+  - https://www.irs.gov/draft-tax-forms
+  - https://www.ftb.ca.gov/forms/{year}/{year}-540-booklet.html
+  - https://www.ftb.ca.gov/file/personal/tax-calculator-tables-rates.asp
+  - https://www.tax.ny.gov/pdf/{year}/inc/it201i_{year}.pdf
+  - https://www.tax.ny.gov/forms/

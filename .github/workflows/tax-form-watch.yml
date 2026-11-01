@@ -1,0 +1,52 @@
+# Monthly check for new official IRS / FTB / NY form PDFs for the next tax year.
+# When some are published it opens (or updates) one issue; an AI assistant or a person
+# then follows .claude/skills/tax-year-update/SKILL.md. Nothing is changed automatically.
+name: Tax form watch
+on:
+  schedule:
+    - cron: "17 14 3 * *"   # 3rd of each month, 14:17 UTC
+  workflow_dispatch:
+    inputs:
+      year:
+        description: "Tax year to check (default: newest year in rules/ + 1)"
+        required: false
+permissions:
+  contents: read
+  issues: write
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: taxprep/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml "pymupdf>=1.24"
+      - name: Check forms
+        id: check
+        run: |
+          YEAR="${{ github.event.inputs.year }}"
+          if [ -z "$YEAR" ]; then YEAR=$(( $(ls rules | grep -E '^[0-9]{4}$' | sort -n | tail -1) + 1 )); fi
+          echo "year=$YEAR" >> "$GITHUB_OUTPUT"
+          python -m tools.taxyear.check_forms --year "$YEAR" --json > forms.json || true
+          python - <<'PY'
+          import json
+          d = json.load(open("forms.json"))
+          rows = "\n".join(f"| {f['title']} | {f['status']} | {f['url'] or ''} |" for f in d["forms"])
+          open("issue.md", "w").write(
+              f"Official form check for tax year {d['year']}.\n\n| Form | Status | URL |\n|---|---|---|\n{rows}\n\n"
+              "Next: follow `.claude/skills/tax-year-update/SKILL.md` (start with `python -m tools.taxyear.new_year "
+              f"--to {d['year']}` if `rules/{d['year']}` does not exist). Forms not FOUND may need to be supplied by hand.\n")
+          PY
+          echo "found=$(python -c "import json;print(sum(f['status']=='FOUND' for f in json.load(open('forms.json'))['forms']))")" >> "$GITHUB_OUTPUT"
+      - name: Open or update issue
+        if: steps.check.outputs.found != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="Tax forms published for tax year ${{ steps.check.outputs.year }}"
+          NUM=$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number')
+          if [ -n "$NUM" ]; then gh issue comment "$NUM" --body-file issue.md; else gh issue create --title "$TITLE" --body-file issue.md; fi
