@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { apiJson, token, downloadPackage, uploadDocument } from "@/lib/api";
+import { apiJson, downloadPackage, uploadDocument } from "@/lib/api";
 import Ledger, { CalcResult, Residency, GREEN, RED } from "@/components/Ledger";
 import { MoneyInput, YesNo, Field, TextInput } from "@/components/Fields";
 
@@ -69,7 +69,6 @@ export default function ReturnWizard() {
 
   /* ---------- load / resume ---------- */
   useEffect(() => {
-    if (!token()) { router.push("/"); return; }
     apiJson(`/returns/${rid}`).then((d) => {
       if (d.taxpayer) setTp({ ...blankTaxpayer, ...d.taxpayer });
       if (d.profile) {
@@ -133,7 +132,7 @@ export default function ReturnWizard() {
   const validate = (): string => {
     if (step === 0) {
       if (!tp.first_name.trim() || !tp.last_name.trim()) return "Enter your first and last name.";
-      if (tp.ssn && !/^\d{3}-?\d{2}-?\d{4}$/.test(tp.ssn)) return "SSN/ITIN must be 9 digits (XXX-XX-XXXX).";
+      if (tp.ssn && !tp.ssn.startsWith("***-**-") && !/^\d{3}-?\d{2}-?\d{4}$/.test(tp.ssn)) return "SSN/ITIN must be 9 digits (XXX-XX-XXXX).";
     }
     if (step === 1) {
       if (!citAns) return "Answer the citizenship question.";
@@ -191,7 +190,7 @@ export default function ReturnWizard() {
         <Field label="First name"><TextInput value={tp.first_name} onChange={(v) => setT({ first_name: v })} /></Field>
         <Field label="Last name"><TextInput value={tp.last_name} onChange={(v) => setT({ last_name: v })} /></Field>
         <Field label="SSN or ITIN" hint="Leave blank if you have neither — you will need to apply for an ITIN (Form W-7) to file a return with income.">
-          <TextInput value={tp.ssn} onChange={(v) => setT({ ssn: v })} placeholder="XXX-XX-XXXX" maxLength={11} /></Field>
+          <TextInput value={tp.ssn} onChange={(v) => setT({ ssn: v })} placeholder="XXX-XX-XXXX" maxLength={11} />{tp.ssn.startsWith("***-**-") && <p className="text-xs text-mute mt-1">Saved and encrypted. Type a new number to replace it.</p>}</Field>
         <Field label="Filing status" hint="Nonresident aliens are limited to single / married filing separately.">
           <select className="inp" value={inc.filing_status} onChange={(e) => setI({ filing_status: e.target.value })}>
             <option value="single">Single</option><option value="mfj">Married filing jointly</option>

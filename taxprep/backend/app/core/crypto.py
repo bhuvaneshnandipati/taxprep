@@ -41,3 +41,52 @@ def protect(d: dict) -> dict:
 
 def reveal(d: dict) -> dict:
     return {k: (dec(v) if k in SENSITIVE else v) for k, v in (d or {}).items()}
+
+
+# ---------------------------------------------------------------- whole-column encryption
+# Return data (names, addresses, income, results, OCR output) is encrypted as a whole
+# with the same DATA_KEY. Stored shape: {"_enc": "<fernet token>"} inside the existing
+# JSON column, so no schema migration is needed and legacy plaintext rows still load
+# (they are re-encrypted on their next save).
+import json as _json
+from sqlalchemy.types import TypeDecorator, JSON as _JSON, String as _String
+
+
+class EncryptedJSON(TypeDecorator):
+    impl = _JSON
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        f = _fernet()
+        if value is None or not f:
+            return value
+        return {"_enc": f.encrypt(_json.dumps(value, separators=(",", ":")).encode()).decode()}
+
+    def process_result_value(self, value, dialect):
+        if isinstance(value, dict) and set(value) == {"_enc"}:
+            f = _fernet()
+            if not f:
+                raise RuntimeError("Encrypted data found but DATA_KEY is not set")
+            return _json.loads(f.decrypt(value["_enc"].encode()))
+        return value
+
+
+class EncryptedString(TypeDecorator):
+    impl = _String
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        return enc(value) if value else value
+
+    def process_result_value(self, value, dialect):
+        return dec(value) if value else value
+
+
+def mask_id(v: str) -> str:
+    """SSN/ITIN shown back to the browser: only the last four digits."""
+    d = "".join(ch for ch in str(v or "") if ch.isdigit())
+    return f"***-**-{d[-4:]}" if len(d) >= 4 else ""
+
+
+def is_masked(v) -> bool:
+    return isinstance(v, str) and v.startswith("***-**-")

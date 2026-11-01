@@ -36,7 +36,7 @@ def test_new_year_is_hidden_draft(rules_copy, monkeypatch):
 def test_unknown_api_year_is_404():
     from fastapi.testclient import TestClient
     from app.main import app
-    c = TestClient(app)
+    c = TestClient(app, headers={"X-TaxPrep": "1"})
     assert c.get("/interview/rules/federal", params={"year": 2025}).status_code == 200
     assert c.get("/interview/rules/federal", params={"year": 1999}).status_code == 404
 

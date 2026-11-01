@@ -11,7 +11,17 @@ class Settings:
     DATABASE_URL = _normalize_db_url(os.getenv("DATABASE_URL", "sqlite:///./taxprep.db"))
     JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-in-prod")
     JWT_ALG = "HS256"
-    ACCESS_TOKEN_MINUTES = int(os.getenv("ACCESS_TOKEN_MINUTES", "240"))
+    # Sessions: sign out after this much inactivity, and always after SESSION_MAX_HOURS.
+    SESSION_IDLE_MINUTES = int(os.getenv("SESSION_IDLE_MINUTES", "60"))
+    SESSION_MAX_HOURS = int(os.getenv("SESSION_MAX_HOURS", "12"))
+    # Sign-in lockout: this many failures within LOCKOUT_MINUTES blocks further attempts.
+    MAX_FAILED_PER_EMAIL = int(os.getenv("MAX_FAILED_PER_EMAIL", "5"))
+    MAX_FAILED_PER_IP = int(os.getenv("MAX_FAILED_PER_IP", "20"))
+    LOCKOUT_MINUTES = int(os.getenv("LOCKOUT_MINUTES", "15"))
+    # Invite-only sign-up: comma-separated emails allowed to create an account.
+    # In production an empty list means nobody can register (existing accounts still sign in).
+    REGISTRATION_EMAILS = [e.strip().lower() for e in os.getenv("REGISTRATION_EMAILS", "").split(",") if e.strip()]
+    PRODUCTION = any(os.getenv(n, "").lower() not in ("", "0", "false") for n in ("PRODUCTION", "RENDER", "VERCEL"))
     DEFAULT_TAX_YEAR = 2025
     # "require" is correct for managed Postgres (Neon/Render/Supabase). Set
     # DB_SSLMODE=disable for a self-hosted Postgres (e.g. reached via an ngrok

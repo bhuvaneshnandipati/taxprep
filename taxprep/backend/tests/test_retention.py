@@ -33,7 +33,7 @@ def test_purge_removes_only_old_entries():
 def test_admin_audit_endpoint_shape_and_purge_route():
     from fastapi.testclient import TestClient
     from app.main import app
-    c = TestClient(app)
+    c = TestClient(app, headers={"X-TaxPrep": "1"})
     tok = {"Authorization": "Bearer " + c.post("/auth/register",
            json={"email": "boss2@test.com", "password": "password123", "admin_code": "test-setup-code"}).json()["access_token"]}
     out = c.get("/admin/audit", headers=tok).json()

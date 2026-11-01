@@ -84,7 +84,7 @@ def test_upload_review_apply_api():
     os.environ["DATABASE_URL"] = "sqlite:///./test_ocr_api.db"
     from fastapi.testclient import TestClient
     from app.main import app
-    c = TestClient(app)
+    c = TestClient(app, headers={"X-TaxPrep": "1"})
     tok = {"Authorization": "Bearer " + c.post("/auth/register",
            json={"email": "ocr@test.com", "password": "password123"}).json()["access_token"]}
     rid = c.post("/returns", headers=tok).json()["id"]

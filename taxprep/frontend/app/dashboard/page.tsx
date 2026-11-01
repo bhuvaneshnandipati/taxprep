@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiJson, token, clearToken } from "@/lib/api";
+import { apiJson, logout, deleteAccount } from "@/lib/api";
 
 type Ret = { id: number; tax_year: number; status: string; updated_at: string; name?: string };
 
@@ -10,7 +10,6 @@ export default function Dashboard() {
   const [returns, setReturns] = useState<Ret[] | null>(null);
 
   useEffect(() => {
-    if (!token()) { r.push("/"); return; }
     apiJson("/returns").then(setReturns).catch(() => r.push("/"));
   }, [r]);
 
@@ -30,7 +29,7 @@ export default function Dashboard() {
         <div><p className="kicker mb-2">Dashboard</p><h1 className="text-3xl sm:text-4xl font-extrabold">Your returns</h1></div>
         <div className="flex flex-wrap gap-3">
           <button className="btn" onClick={create}>+ Start 2025 return</button>
-          <button className="btn-ghost" onClick={() => { clearToken(); r.push("/"); }}>Sign out</button>
+          <button className="btn-ghost" onClick={logout}>Sign out</button>
         </div>
       </div>
       {returns === null ? <p className="text-gray-500">Loading…</p> :
@@ -56,6 +55,15 @@ export default function Dashboard() {
           ))}
         </div>
       )}
+      <details className="mt-12 text-sm text-mute">
+        <summary className="cursor-pointer">Account &amp; privacy</summary>
+        <div className="card mt-3">
+          <p className="mb-3">Your returns are encrypted in the database. SSNs are shown only as the last four digits. Sessions end after an hour of inactivity.</p>
+          <button className="text-owe underline" onClick={async () => {
+            if (confirm("Permanently delete your account, every return and every uploaded document? This cannot be undone.")) await deleteAccount();
+          }}>Delete my account and all data</button>
+        </div>
+      </details>
     </main>
   );
 }

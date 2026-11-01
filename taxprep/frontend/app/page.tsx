@@ -1,12 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiAvailable, login, register } from "@/lib/api";
+import { login, register } from "@/lib/api";
 
 export default function AuthPage() {
   const r = useRouter();
-  const [available, setAvailable] = useState(false);
-  useEffect(() => setAvailable(apiAvailable()), []);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -51,7 +49,6 @@ export default function AuthPage() {
         </div>
       </section>
       <section aria-label="Account">
-      {!available && <p className="text-sm mb-4">Hosted backend unavailable: account creation and sign-in are disabled until the replacement API is verified.</p>}
       <div className="card p-6 sm:p-8 shadow-lift"><h2 className="text-2xl mb-1">{mode === "login" ? "Welcome back" : "Create your account"}</h2><p className="text-sm text-mute mb-6">{mode === "login" ? "Sign in to resume a saved return." : "Takes about 15 minutes to finish a return."}</p>
       <form onSubmit={(e) => { e.preventDefault(); if (!busy) submit(); }}>
         <div className="flex gap-1 mb-6 p-1 rounded-full bg-paper border border-hair w-fit">
@@ -72,7 +69,7 @@ export default function AuthPage() {
             <input className="inp mt-2" value={adminCode} onChange={(e) => setAdminCode(e.target.value)} placeholder="Only for the site administrator" />
           </details>)}
         {err && <p role="alert" className="text-sm text-owe mb-4">{err}</p>}
-        <button className="btn w-full" type="submit" disabled={busy || !available}>
+        <button className="btn w-full" type="submit" disabled={busy}>
           {busy ? "Working…" : mode === "login" ? "Sign in" : "Create account"}
         </button>
       </form></div>

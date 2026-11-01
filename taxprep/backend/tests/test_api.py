@@ -2,7 +2,7 @@
 from fastapi.testclient import TestClient
 from app.main import app
 
-client = TestClient(app)
+client = TestClient(app, headers={"X-TaxPrep": "1"})
 
 
 def _auth(email):
@@ -100,4 +100,18 @@ def test_ssn_encrypted_at_rest():
     stored = db.query(TaxReturn).get(rid).profile["taxpayer"]["ssn"]
     db.close()
     assert stored.startswith("enc:") and "6789" not in stored
-    assert client.get(f"/returns/{rid}", headers=tok).json()["taxpayer"]["ssn"] == "123-45-6789"
+    # the browser only ever sees the last four digits
+    tp = client.get(f"/returns/{rid}", headers=tok).json()["taxpayer"]
+    assert tp["ssn"] == "***-**-6789"
+    # saving the masked value back keeps the real number
+    tp["first_name"] = "C"
+    client.put(f"/returns/{rid}/taxpayer", headers=tok, json=tp)
+    from app.core.crypto import dec
+    db = SessionLocal()
+    assert dec(db.query(TaxReturn).get(rid).profile["taxpayer"]["ssn"]) == "123-45-6789"
+    # the whole return is encrypted in the database column, not just the SSN
+    from sqlalchemy import text
+    raw = db.execute(text("select profile, income from tax_returns where id=:i"), {"i": rid}).first()
+    db.close()
+    assert '"_enc"' in str(raw[0]) and "C" not in str(raw[0]).replace('"_enc"', "")[:12]
+    assert '"first_name"' not in str(raw[0])

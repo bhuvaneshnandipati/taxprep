@@ -11,7 +11,7 @@ from ..engines.federal import compute_federal, FederalInput
 from ..engines.states.registry import compute_state, StateInput
 from ..engines.interview import next_questions, progress
 from ..engines.rules_loader import load_rules
-from ..core.crypto import protect, reveal
+from ..core.crypto import protect, reveal, mask_id, is_masked, SENSITIVE
 
 router = APIRouter(prefix="/returns", tags=["returns"])
 
@@ -69,6 +69,12 @@ def get_return(rid: int, email: str = Depends(current_user_email), db: Session =
     r = _ret(db, email, rid)
     prof = reveal(dict(r.profile or {}))
     taxpayer = reveal(prof.pop("taxpayer", {}))
+    # Identifiers never go back to the browser in full; the masked value is sent
+    # back unchanged on save and the stored value is kept (see _keep_masked).
+    for d in (prof, taxpayer):
+        for k in SENSITIVE:
+            if d.get(k):
+                d[k] = mask_id(d[k])
     out = {"id": r.id, "tax_year": r.tax_year, "status": r.status, "taxpayer": taxpayer,
            "profile": prof or None, "answers": r.answers or {}, "income": r.income or None,
            "residency": None, "next_questions": next_questions(r.answers or {}),
@@ -97,7 +103,7 @@ def delete_return(rid: int, email: str = Depends(current_user_email), db: Sessio
 def save_profile(rid: int, body: ProfileIn, email: str = Depends(current_user_email), db: Session = Depends(get_db)):
     r = _ret(db, email, rid)
     prof = dict(r.profile or {})
-    prof.update(protect(body.model_dump()))
+    prof.update(protect(_keep_masked(body.model_dump(), prof)))
     r.profile = prof
     res = residency_for(prof, r.tax_year)
     merged = dict(r.answers or {}); merged.update(_profile_answers(prof, res.status))
@@ -130,9 +136,18 @@ def save_income(rid: int, body: IncomeIn, email: str = Depends(current_user_emai
 @router.put("/{rid}/taxpayer")
 def save_taxpayer(rid: int, body: TaxpayerIn, email: str = Depends(current_user_email), db: Session = Depends(get_db)):
     r = _ret(db, email, rid)
-    prof = dict(r.profile or {}); prof["taxpayer"] = protect(body.model_dump())
+    prof = dict(r.profile or {})
+    prof["taxpayer"] = protect(_keep_masked(body.model_dump(), prof.get("taxpayer") or {}))
     r.profile = prof; db.commit()
     return {"ok": True}
+
+
+def _keep_masked(new: dict, old: dict) -> dict:
+    """A masked identifier coming back from the browser means 'unchanged'."""
+    for k in SENSITIVE:
+        if is_masked(new.get(k)):
+            new[k] = old.get(k, "")
+    return new
 
 
 def _invalidate(r: TaxReturn):

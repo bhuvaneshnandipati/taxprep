@@ -59,7 +59,7 @@ def test_dual_status_flag():
 def test_admin_rbac_and_endpoints():
     from fastapi.testclient import TestClient
     from app.main import app
-    c = TestClient(app)
+    c = TestClient(app, headers={"X-TaxPrep": "1"})
     user_tok = {"Authorization": "Bearer " + c.post("/auth/register",
                 json={"email": "pleb@test.com", "password": "password123"}).json()["access_token"]}
     # reserved admin email cannot be registered without the setup code (prevents admin takeover)
@@ -84,7 +84,7 @@ def test_admin_rbac_and_endpoints():
 def test_calculate_with_ny():
     from fastapi.testclient import TestClient
     from app.main import app
-    c = TestClient(app)
+    c = TestClient(app, headers={"X-TaxPrep": "1"})
     tok = {"Authorization": "Bearer " + c.post("/auth/register",
            json={"email": "ny@test.com", "password": "password123"}).json()["access_token"]}
     rid = c.post("/returns", headers=tok).json()["id"]

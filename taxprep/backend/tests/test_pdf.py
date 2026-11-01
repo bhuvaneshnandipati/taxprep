@@ -123,7 +123,7 @@ def test_schedule_2_in_package_keeps_supporting_form_warning():
 
 
 def test_api_pdf_endpoint():
-    c = TestClient(app)
+    c = TestClient(app, headers={"X-TaxPrep": "1"})
     tok = {"Authorization": "Bearer " + c.post("/auth/register", json={"email": "pdf@test.com",
            "password": "password123"}).json()["access_token"]}
     rid = c.post("/returns", headers=tok).json()["id"]

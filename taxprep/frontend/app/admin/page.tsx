@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiJson, token } from "@/lib/api";
+import { apiJson } from "@/lib/api";
 
 type Tab = "users" | "audit" | "review" | "rules";
 
@@ -23,7 +23,7 @@ export default function AdminPage() {
       if (t === "rules") setData(await apiJson("/admin/rules"));
     } catch (e: any) { setErr(e.message); }
   };
-  useEffect(() => { if (!token()) { r.push("/"); return; } load(tab); /* eslint-disable-next-line */ }, [tab]);
+  useEffect(() => { load(tab); /* eslint-disable-next-line */ }, [tab]);
 
   const openPack = async (year: string, pack: string) => {
     setPackSel({ year, pack });
