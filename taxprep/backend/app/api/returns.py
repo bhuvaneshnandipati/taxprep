@@ -75,8 +75,11 @@ def get_return(rid: int, email: str = Depends(current_user_email), db: Session =
         for k in SENSITIVE:
             if d.get(k):
                 d[k] = mask_id(d[k])
+    income = dict(r.income) if r.income else None
+    if income and income.get("dependents"):
+        income["dependents"] = [dict(d, ssn=mask_id(d.get("ssn"))) for d in income["dependents"]]
     out = {"id": r.id, "tax_year": r.tax_year, "status": r.status, "taxpayer": taxpayer,
-           "profile": prof or None, "answers": r.answers or {}, "income": r.income or None,
+           "profile": prof or None, "answers": r.answers or {}, "income": income,
            "residency": None, "next_questions": next_questions(r.answers or {}),
            "progress": progress(r.answers or {}), "result": None}
     if prof:
@@ -127,7 +130,14 @@ def save_answers(rid: int, body: AnswersIn, email: str = Depends(current_user_em
 @router.put("/{rid}/income")
 def save_income(rid: int, body: IncomeIn, email: str = Depends(current_user_email), db: Session = Depends(get_db)):
     r = _ret(db, email, rid)
-    r.income = body.model_dump()
+    new = body.model_dump()
+    old_deps = (r.income or {}).get("dependents") or []
+    for i, d in enumerate(new.get("dependents") or []):   # masked SSN from the browser = unchanged
+        if is_masked(d.get("ssn")):
+            match = next((o for o in old_deps if o.get("first_name") == d["first_name"] and o.get("last_name") == d["last_name"]),
+                         old_deps[i] if i < len(old_deps) else {})
+            d["ssn"] = match.get("ssn", "")
+    r.income = new
     _invalidate(r)
     db.commit()
     return {"ok": True}
@@ -186,6 +196,26 @@ def run_calculation(r: TaxReturn) -> dict:
         raise ValueError("One employer withheld more Social Security tax than the 2025 maximum "
                          f"(${max_ss:,.2f}). Ask that employer to refund the excess; it cannot be claimed on the return.")
     excess_ss = round(max(0.0, sum(by_employer.values()) - max_ss), 2) if len(by_employer) > 1 else 0.0
+    # Totals come from the detail lists when those are filled in.
+    if inc["dependents"]:
+        inc["qualifying_children"] = sum(d["credit"] == "ctc" for d in inc["dependents"])
+        inc["other_dependents"] = sum(d["credit"] == "odc" for d in inc["dependents"])
+    if inc["interest_payers"]:
+        inc["interest"] = sum(p_["amount"] for p_ in inc["interest_payers"])
+    if inc["dividend_payers"]:
+        inc["dividends"] = sum(p_["amount"] for p_ in inc["dividend_payers"])
+    st_gain = inc["capital_gain_st"] + inc["st_proceeds"] - inc["st_basis"] - inc["st_loss_carryover"]
+    lt_gain = inc["capital_gain_lt"] + inc["lt_proceeds"] - inc["lt_basis"] - inc["lt_loss_carryover"]
+    biz = inc["business"]
+    se_income = inc["se_income"]
+    if biz:
+        biz["meals"] = round(biz["meals_total"] * 0.5, 2)
+        biz["expenses"] = sum(biz[k] for k in ("advertising", "car_truck", "commissions", "contract_labor", "insurance",
+                                               "legal_professional", "office", "supplies", "taxes_licenses", "travel",
+                                               "meals", "utilities", "other_expenses"))
+        biz["gross_income"] = biz["gross_receipts"] - biz["returns"]
+        biz["net_profit"] = biz["gross_income"] - biz["expenses"]
+        se_income = biz["net_profit"]
     fin = FederalInput(
         filing_status=inc["filing_status"],
         wages=sum(w["wages"] for w in w2s),
@@ -194,14 +224,15 @@ def run_calculation(r: TaxReturn) -> dict:
         medicare_tax_withheld=sum(w["medicare_tax"] for w in w2s), excess_ss_credit=excess_ss,
         medical_expenses=inc["medical_expenses"], real_estate_tax=inc["real_estate_tax"],
         mortgage_interest=inc["mortgage_interest"], charitable_noncash=inc["charitable_noncash"],
-        spouse_age=inc["spouse_age"],
+        spouse_age=inc["spouse_age"], fica_withheld=sum(w["ss_tax"] + w["medicare_tax"] for w in w2s),
+        foreign_accounts=inc["foreign_accounts"], foreign_trust=inc["foreign_trust"],
         wages_nr_period=inc["wages_nr_period"],
         comp_1042s=inc["comp_1042s"], scholarship_1042s=inc["scholarship_1042s"],
         withholding_1042s=inc["withholding_1042s"],
         interest=inc["interest"], dividends=inc["dividends"],
         qualified_dividends=inc["qualified_dividends"],
-        capital_gain_lt=inc["capital_gain_lt"], capital_gain_st=inc["capital_gain_st"],
-        se_income=inc["se_income"], scholarship_taxable=inc["scholarship_taxable"],
+        capital_gain_lt=lt_gain, capital_gain_st=st_gain,
+        se_income=se_income, scholarship_taxable=inc["scholarship_taxable"],
         student_loan_interest=inc["student_loan_interest"], itemized=inc["itemized"],
         state_income_tax_paid=all_state_tax, charitable=inc["charitable"],
         other_itemized=inc["other_itemized"], qualified_tips=inc["qualified_tips"],
@@ -242,7 +273,8 @@ def run_calculation(r: TaxReturn) -> dict:
             "_dependents": inc["qualifying_children"] + inc["other_dependents"],
             "_state_wages": sum(w["state_wages"] or w["wages"] for w in w2s if (w.get("state") or state).upper() == state),
             "_state_std": std, "_wages_nr_period": inc["wages_nr_period"],
-            "_payers": "; ".join(dict.fromkeys(w["employer"] for w in w2s if w.get("employer")))}
+            "_payers": "; ".join(dict.fromkeys(w["employer"] for w in w2s if w.get("employer"))),
+            "_income": inc}
 
 
 @router.post("/{rid}/calculate")

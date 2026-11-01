@@ -90,3 +90,72 @@ def test_resident_alien_china_treaty_form_8833():
     if "Form 8833" in _forms(res):
         t = _form(doc, "Treaty-Based Return Position Disclosure")
         assert "China" in t and "Gamma Corp" in t
+
+
+FAMILY = {"filing_status": "mfj", "state": "TX",
+          "w2s": [{"employer": "Delta Co", "wages": 80000, "fed_withholding": 5000, "ss_tax": 4960, "medicare_tax": 1160}],
+          "dependents": [{"first_name": "Kid", "last_name": "One", "ssn": "111-22-3333", "relationship": "Son", "credit": "ctc"},
+                         {"first_name": "Kid", "last_name": "Two", "ssn": "111-22-4444", "relationship": "Daughter", "credit": "ctc"}],
+          "interest_payers": [{"name": "Chase Bank", "amount": 1200}, {"name": "Ally Bank", "amount": 800}],
+          "foreign_accounts": True, "fbar_required": True, "foreign_account_countries": "India",
+          "st_proceeds": 10000, "st_basis": 12000, "lt_proceeds": 20000, "lt_basis": 15000,
+          "business": {"description": "Software consulting", "code": "541510", "name": "Test Consulting",
+                       "gross_receipts": 12000, "supplies": 1000, "meals_total": 400, "other_expenses": 300,
+                       "other_description": "Software subscriptions"}}
+
+
+def test_family_dependents_schedules_b_c_d_8812():
+    res, doc = _pkg({"citizen": True}, FAMILY)
+    L = res["federal"]["lines"]
+    forms = _forms(res)
+    for f in ("Schedule B", "Schedule C", "Schedule D", "Schedule 8812", "Schedule SE"):
+        assert f in forms, f
+    # interest from the payer list; capital: -2,000 short-term + 5,000 long-term = 3,000
+    assert L["taxable_interest"] == 2000 and L["capital_gain"] == 3000
+    # Schedule C: 12,000 - (1,000 + 50% x 400 + 300) = 10,500
+    assert L["sched1_business"] == 10500
+    sb = _form(doc, "SCHEDULE B")
+    assert "Chase Bank" in sb and "1,200" in sb and "India" in sb
+    sc = _form(doc, "SCHEDULE C")
+    assert "Software consulting" in sc and "5 4 1 5 1 0" in sc and "10,500" in sc
+    assert "Software subscriptions" in _form(doc, "Other Expenses")       # Part V on page 2
+    sd = _form(doc, "SCHEDULE D")
+    assert "20,000" in sd and "15,000" in sd and "(2,000)" in sd
+    assert "3,000" in _form(doc, "Summary")                                # line 16, page 2
+    s8 = _form(doc, "Credits for Qualifying Children")
+    assert "4,400" in s8                                    # 2 x $2,200
+    f1040 = _form(doc, "U.S. Individual Income Tax Return")
+    assert "Kid" in f1040 and "Son" in f1040
+    assert "1 1 1 2 2 3 3 3 3" in f1040                                   # full 9-digit SSN in the comb boxes
+    # no leftover "attach yourself" items for these forms
+    assert not any(m in " ".join(res["checklist"]) for m in ("Form 8949",))
+
+
+def test_three_children_part_ii_b():
+    inc = {"filing_status": "mfj", "state": "TX",
+           "w2s": [{"wages": 30000, "ss_tax": 1860, "medicare_tax": 435}],
+           "qualifying_children": 3}
+    from app.api.returns import run_calculation
+    L = run_calculation(_R({"citizen": True}, inc))["federal"]["lines"]
+    S = L["s8812"]
+    # tax 0, so line 16a = 6,600; 16b = 5,100; line 17 = 5,100; line 20 = 15% x 27,500 = 4,125 < 5,100 -> Part II-B
+    assert S["line17"] == 5100 and S["line20"] == 4125 and "line25" in S
+    # line 25 = max(0, FICA 2,295 - EITC) = 0, so ACTC = line 20
+    assert L["actc"] == 4125
+
+
+def test_dependent_ssn_masked_in_api_and_kept_on_save():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    c = TestClient(app, headers={"X-TaxPrep": "1"})
+    c.post("/auth/register", json={"email": "deps@test.com", "password": "password123"})
+    rid = c.post("/returns").json()["id"]
+    c.put(f"/returns/{rid}/income", json={"dependents": FAMILY["dependents"]})
+    got = c.get(f"/returns/{rid}").json()["income"]
+    assert got["dependents"][0]["ssn"] == "***-**-3333"
+    c.put(f"/returns/{rid}/income", json=got)              # browser sends the masked values back
+    from app.db.session import SessionLocal
+    from app.db.models import TaxReturn
+    db = SessionLocal()
+    assert db.query(TaxReturn).get(rid).income["dependents"][0]["ssn"] == "111-22-3333"
+    db.close()

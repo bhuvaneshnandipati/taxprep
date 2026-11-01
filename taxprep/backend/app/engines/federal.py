@@ -125,6 +125,9 @@ class FederalInput:
     mortgage_interest: float = 0.0        # Schedule A line 8a (Form 1098)
     charitable_noncash: float = 0.0       # Schedule A line 12
     spouse_age: int = 0                   # MFJ only; 0 = unknown
+    fica_withheld: float = 0.0            # W-2 boxes 4 + 6 (Schedule 8812 Part II-B)
+    foreign_accounts: bool = False        # Schedule B Part III
+    foreign_trust: bool = False
     qualified_tips: float = 0.0           # Schedule 1-A
     qualified_overtime: float = 0.0       # Schedule 1-A (FLSA premium portion only)
     has_ssn: bool = True
@@ -250,7 +253,9 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
                   f"${-net_cg - cl_limit:,.0f} carries forward.")
     pref_gain = max(0.0, min(lt, net_cg))         # net capital gain eligible for 0/15/20% rates
     if st or lt:
-        sched += ["Schedule D", "Form 8949"]
+        sched.append("Schedule D")
+    if not is_nra and (interest > 1500 or dividends > 1500 or inp.foreign_accounts or inp.foreign_trust):
+        sched.append("Schedule B")
 
     # ---------------- self-employment ------------------------------------------------------
     se = inp.se_income
@@ -400,30 +405,36 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
             sched += ["Form 8863", "Schedule 3"]
 
     ctc = actc = odc = 0.0
+    s8812 = {}
     kids, deps = inp.qualifying_children, inp.other_dependents
     if (kids or deps) and is_nra:
         ex.append("Child tax credit is generally not available on Form 1040-NR (exceptions exist for residents "
                   "of Canada, Mexico, South Korea and Indian students — not computed here).")
     elif kids or deps:
         cfg = R["child_tax_credit"]
-        gross = kids * cfg["per_child"] + deps * cfg["other_dependent_credit"]
+        line8 = kids * cfg["per_child"] + deps * cfg["other_dependent_credit"]
         po = cfg["phaseout_agi"][fs]
-        if agi > po:
-            reduction = math.ceil((agi - po) / 1000) * cfg["phaseout_rate_per_1000"]
-            gross = max(0.0, gross - reduction)
-            ex.append(f"Child/dependent credits reduced by ${reduction:,.0f} (AGI over ${po:,}).")
-        limit = max(0.0, tax - edu_nonref)
-        allowed = min(gross, limit)
-        child_part = min(gross, kids * cfg["per_child"])
-        odc_part = gross - child_part
-        odc = min(odc_part, allowed)                 # ODC uses the limit first (nonrefundable only)
+        line10 = math.ceil(max(0.0, agi - po) / 1000) * 1000
+        line11 = line10 * cfg["phaseout_rate_per_1000"] / 1000
+        if line11:
+            ex.append(f"Child/dependent credits reduced by ${line11:,.0f} (AGI over ${po:,}).")
+        line12 = max(0.0, line8 - line11)
+        line13 = max(0.0, tax - edu_nonref)               # Credit Limit Worksheet A
+        allowed = min(line12, line13)
+        child_part = min(line12, kids * cfg["per_child"])
+        odc = min(line12 - child_part, allowed)           # ODC uses the limit first (nonrefundable only)
         ctc = allowed - odc
-        unused_ctc = max(0.0, child_part - ctc)
-        if unused_ctc > 0 and kids:
-            earned = wages + max(0.0, se - se_ded)
-            actc = min(unused_ctc, kids * cfg["refundable_max_per_child"],
-                       max(0.0, earned - cfg["earned_income_floor"]) * cfg["refundable_rate"])
-            actc = rnd(actc)
+        line16a = max(0.0, line12 - allowed)
+        line16b = kids * cfg["refundable_max_per_child"]
+        line17 = min(line16a, line16b)
+        earned = wages + max(0.0, se - se_ded)
+        line19 = max(0.0, earned - cfg["earned_income_floor"])
+        line20 = rnd(line19 * cfg["refundable_rate"])
+        actc = rnd(min(line17, line20)) if line17 else 0.0  # Part II-B (3+ children) is applied after EITC
+        s8812 = {"kids": kids, "odc_count": deps, "line5": kids * cfg["per_child"], "line7": deps * cfg["other_dependent_credit"],
+                 "line8": line8, "line9": po, "line10": line10, "line11": line11, "line12": line12, "line13": line13,
+                 "line14": allowed, "line16a": line16a, "line16b": line16b, "line17": line17, "line18a": earned,
+                 "line19": line19, "line20": line20, "line23": inp.fica_withheld + se_ded if kids >= 3 else 0.0}
         sched.append("Schedule 8812")
         ex.append(f"Child tax credit / credit for other dependents ${ctc + odc:,.0f}"
                   + (f"; additional (refundable) child tax credit ${actc:,.0f}." if actc else "."))
@@ -454,6 +465,14 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
                 ex.append(f"Earned Income Credit ${eitc:,.0f}.")
                 if k == 0 and not inp.age:
                     warn.append("EIC without children requires age 25-64 at year end — confirm your age.")
+
+    if s8812 and s8812["kids"] >= 3 and s8812["line17"] and s8812["line20"] < s8812["line17"]:
+        line24 = eitc + inp.excess_ss_credit
+        line25 = max(0.0, s8812["line23"] - line24)
+        actc = rnd(min(s8812["line17"], max(s8812["line20"], line25)))
+        s8812.update(line24=line24, line25=line25, line26=max(s8812["line20"], line25))
+    if s8812:
+        s8812["line27"] = actc
 
     # ---------------- other taxes ----------------------------------------------------------
     am = R["additional_medicare"]
@@ -521,6 +540,7 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
         "magi": r(agi), "net_investment_income": r(inp.interest + inp.dividends + max(0.0, net_cg)) if not is_nra else 0.0,
         "capital_gain_st": r(st), "capital_gain_lt": r(lt), "se_net_earnings": r(se * R["self_employment"]["net_earnings_factor"]) if se_tax else 0.0,
         "medicare_se_wages": r(med_se),
+        "s8812": {k: (r(v) if isinstance(v, float) else v) for k, v in s8812.items()},
         "sched1a_tips": r(tips_ded), "sched1a_overtime": r(ot_ded), "sched1a_total": r(s1a_total),
         "total_deductions": r(deduction + s1a_total), "taxable_income": r(taxable), "tax": r(tax),
         "ctc_odc": r(ctc + odc), "education_credit": r(edu_nonref), "other_credits": r(edu_nonref),

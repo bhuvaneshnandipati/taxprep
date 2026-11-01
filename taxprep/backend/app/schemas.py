@@ -68,6 +68,47 @@ class W2In(BaseModel):
 FilingStatus = Literal["single", "mfj", "mfs", "hoh", "qss"]
 
 
+class DependentIn(BaseModel):
+    first_name: str = Field(default="", max_length=40)
+    last_name: str = Field(default="", max_length=40)
+    ssn: str = Field(default="", max_length=11)
+    relationship: str = Field(default="", max_length=30)       # e.g. Son, Daughter, Parent
+    lived_with_you: bool = True       # more than half of the year
+    lived_in_us: bool = True
+    full_time_student: bool = False
+    disabled: bool = False
+    credit: Literal["ctc", "odc", "none"] = "ctc"   # ctc: under 17 with an SSN; odc: other dependent
+
+
+class PayerIn(BaseModel):
+    name: str = Field(default="", max_length=60)
+    amount: Money = NonNeg
+
+
+class BusinessIn(BaseModel):
+    """Schedule C. Expenses by category (line numbers in comments)."""
+    description: str = Field(default="", max_length=60)      # A: principal business or profession
+    code: str = Field(default="", max_length=6)              # B: 6-digit business code
+    name: str = Field(default="", max_length=60)             # C
+    ein: str = Field(default="", max_length=10)              # D
+    gross_receipts: Money = NonNeg                           # 1
+    returns: Money = NonNeg                                  # 2
+    advertising: Money = NonNeg                              # 8
+    car_truck: Money = NonNeg                                # 9
+    commissions: Money = NonNeg                              # 10
+    contract_labor: Money = NonNeg                           # 11
+    insurance: Money = NonNeg                                # 15
+    legal_professional: Money = NonNeg                       # 17
+    office: Money = NonNeg                                   # 18
+    supplies: Money = NonNeg                                 # 22
+    taxes_licenses: Money = NonNeg                           # 23
+    travel: Money = NonNeg                                   # 24a
+    meals_total: Money = NonNeg                              # 24b is 50% of this
+    utilities: Money = NonNeg                                # 25
+    other_expenses: Money = NonNeg                           # 27b / Part V
+    other_description: str = Field(default="", max_length=60)
+
+
 class IncomeIn(BaseModel):
     filing_status: FilingStatus = "single"
     w2s: list[W2In] = []
@@ -106,6 +147,22 @@ class IncomeIn(BaseModel):
     qualifying_children: int = Field(default=0, ge=0, le=20)
     other_dependents: int = Field(default=0, ge=0, le=20)
     estimated_payments: Money = NonNeg
+    # details for the official forms
+    dependents: list[DependentIn] = Field(default=[], max_length=10)
+    interest_payers: list[PayerIn] = Field(default=[], max_length=14)     # Schedule B Part I
+    dividend_payers: list[PayerIn] = Field(default=[], max_length=15)     # Schedule B Part II
+    foreign_accounts: bool = False           # any foreign bank/brokerage account (Schedule B line 7a)
+    fbar_required: bool = False              # foreign accounts together over $10,000 at any time
+    foreign_account_countries: str = Field(default="", max_length=120)
+    foreign_trust: bool = False
+    # Form 1099-B totals for sales with basis reported to the IRS and no adjustments (Schedule D 1a / 8a)
+    st_proceeds: Money = NonNeg
+    st_basis: Money = NonNeg
+    lt_proceeds: Money = NonNeg
+    lt_basis: Money = NonNeg
+    st_loss_carryover: Money = NonNeg        # from last year's Capital Loss Carryover Worksheet
+    lt_loss_carryover: Money = NonNeg
+    business: Optional[BusinessIn] = None    # Schedule C
     # state
     state: str = Field(default="CA", max_length=2)
     ca_full_year_resident: bool = True       # (name kept for compatibility) full-year resident of `state`

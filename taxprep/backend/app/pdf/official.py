@@ -75,7 +75,21 @@ def form_1040(year, tp, fed, dual=False):
         "f2_30[0]": money(L["overpaid"]), "f2_31[0]": money(L["overpaid"]), "f2_35[0]": money(L["owed"]),
         "f2_40[0]": tp.get("occupation", ""), "f2_44[0]": tp.get("phone", ""), "f2_45[0]": tp.get("email", ""),
     }
-    radios = {"c1_8[0]": FS_1040[fed["filing_status"]], "c1_8[1]": FS_1040[fed["filing_status"]],
+    deps = fed.get("_dependents_list") or []
+    for i, d in enumerate(deps[:4]):
+        v[f"f1_{31 + i}[0]"] = d.get("first_name", "")
+        v[f"f1_{35 + i}[0]"] = d.get("last_name", "")
+        v[f"f1_{39 + i}[0]"] = digits(d.get("ssn", ""))       # 9-box comb field
+        v[f"f1_{43 + i}[0]"] = d.get("relationship", "")
+        v[f"c1_{12 + 2 * i}[0]"] = bool(d.get("lived_with_you"))
+        v[f"c1_{13 + 2 * i}[0]"] = bool(d.get("lived_with_you") and d.get("lived_in_us"))
+        v[f"c1_{20 + 2 * i}[0]"] = bool(d.get("full_time_student"))
+        v[f"c1_{21 + 2 * i}[0]"] = bool(d.get("disabled"))
+    if len(deps) > 4:
+        v["c1_11[0]"] = True
+    dep_radios = {f"c1_{28 + i}[{0 if d.get('credit') == 'ctc' else 1}]": ("1" if d.get("credit") == "ctc" else "2")
+                  for i, d in enumerate(deps[:4]) if d.get("credit") in ("ctc", "odc")}
+    radios = {**dep_radios, "c1_8[0]": FS_1040[fed["filing_status"]], "c1_8[1]": FS_1040[fed["filing_status"]],
               "c1_8[2]": FS_1040[fed["filing_status"]],
               **_yes_no("c1_10", False), "c2_17[0]": "Off", "c2_17[1]": "2"}
     doc = fill_pdf(template_path(year, "f1040.pdf"), v, radios=radios)
@@ -626,3 +640,101 @@ def _chunks(text, n):
         else:
             line = (line + " " + w).strip()
     return out + ([line] if line else [])
+
+
+def schedule_b(year, tp, inc, fed):
+    L = fed["lines"]
+    name, ssn = _head(tp)
+    v = {"f1_01[0]": name, "f1_02[0]": ssn}
+    ip = [p for p in inc.get("interest_payers") or [] if p.get("amount")] or \
+        ([{"name": "Interest (see Forms 1099-INT)", "amount": L["taxable_interest"]}] if L["taxable_interest"] else [])
+    for i, p in enumerate(ip[:14]):
+        v[f"f1_{3 + 2 * i:02d}[0]"] = p["name"]; v[f"f1_{4 + 2 * i:02d}[0]"] = money(p["amount"])
+    v["f1_31[0]"] = money(L["taxable_interest"]); v["f1_33[0]"] = money(L["taxable_interest"])
+    dp = [p for p in inc.get("dividend_payers") or [] if p.get("amount")] or \
+        ([{"name": "Dividends (see Forms 1099-DIV)", "amount": L["ordinary_dividends"]}] if L["ordinary_dividends"] else [])
+    for i, p in enumerate(dp[:15]):
+        v[f"f1_{34 + 2 * i}[0]"] = p["name"]; v[f"f1_{35 + 2 * i}[0]"] = money(p["amount"])
+    v["f1_64[0]"] = money(L["ordinary_dividends"])
+    fa = bool(inc.get("foreign_accounts"))
+    radios = {**_yes_no("c1_1", fa), **_yes_no("c1_3", bool(inc.get("foreign_trust")))}
+    if fa:
+        radios.update(_yes_no("c1_2", bool(inc.get("fbar_required"))))
+        v["f1_65[0]"] = inc.get("foreign_account_countries", "")
+    return fill_pdf(template_path(year, "f1040sb.pdf"), v, radios=radios)
+
+
+def schedule_d(year, tp, inc, fed):
+    """Schedule D using 1099-B totals (basis reported to the IRS, no adjustments): lines 1a and 8a."""
+    L = fed["lines"]
+    name, ssn = _head(tp)
+    st_h = inc.get("st_proceeds", 0) - inc.get("st_basis", 0) + inc.get("capital_gain_st", 0)
+    lt_h = inc.get("lt_proceeds", 0) - inc.get("lt_basis", 0) + inc.get("capital_gain_lt", 0)
+    st_net = st_h - inc.get("st_loss_carryover", 0)
+    lt_net = lt_h - inc.get("lt_loss_carryover", 0)
+    total = st_net + lt_net
+    v = {"f1_1[0]": name, "f1_2[0]": ssn}
+    if st_h or inc.get("st_proceeds"):
+        v.update({"f1_3[0]": money(inc.get("st_proceeds", 0)), "f1_4[0]": money(inc.get("st_basis", 0)),
+                  "f1_6[0]": money(st_h, blank_zero=False)})
+    v.update({"f1_21[0]": money(inc.get("st_loss_carryover", 0), parens=False), "f1_22[0]": money(st_net)})
+    if lt_h or inc.get("lt_proceeds"):
+        v.update({"f1_23[0]": money(inc.get("lt_proceeds", 0)), "f1_24[0]": money(inc.get("lt_basis", 0)),
+                  "f1_26[0]": money(lt_h, blank_zero=False)})
+    v.update({"f1_42[0]": money(inc.get("lt_loss_carryover", 0), parens=False), "f1_43[0]": money(lt_net),
+              "f2_1[0]": money(total, blank_zero=False)})
+    radios = {**_yes_no("c1_1", False)}
+    if total > 0:
+        both = lt_net > 0
+        radios.update(_yes_no("c2_1", both))
+        if both:
+            radios.update(_yes_no("c2_2", True))      # lines 18 and 19 are zero
+    elif total < 0:
+        v["f2_4[0]"] = money(L["capital_gain"])
+        radios.update(_yes_no("c2_3", bool(L["qualified_dividends"])))
+    return fill_pdf(template_path(year, "f1040sd.pdf"), v, radios=radios)
+
+
+def schedule_c(year, tp, biz):
+    name, ssn = _head(tp, ssn_dashed)
+    b = biz
+    v = {"f1_1[0]": name, "f1_2[0]": ssn, "f1_3[0]": b.get("description", ""), "f1_4[0]": digits(b.get("code", "")),
+         "f1_5[0]": b.get("name", ""), "f1_6[0]": digits(b.get("ein", "")),
+         "f1_10[0]": money(b["gross_receipts"]), "f1_11[0]": money(b["returns"]),
+         "f1_12[0]": money(b["gross_income"]), "f1_14[0]": money(b["gross_income"]), "f1_16[0]": money(b["gross_income"], blank_zero=False),
+         "f1_17[0]": money(b["advertising"]), "f1_18[0]": money(b["car_truck"]), "f1_19[0]": money(b["commissions"]),
+         "f1_20[0]": money(b["contract_labor"]), "f1_24[0]": money(b["insurance"]), "f1_27[0]": money(b["legal_professional"]),
+         "f1_28[0]": money(b["office"]), "f1_33[0]": money(b["supplies"]), "f1_34[0]": money(b["taxes_licenses"]),
+         "f1_35[0]": money(b["travel"]), "f1_36[0]": money(b["meals"]), "f1_37[0]": money(b["utilities"]),
+         "f1_39[0]": money(b["other_expenses"]), "f1_41[0]": money(b["expenses"], blank_zero=False),
+         "f1_42[0]": money(b["net_profit"], blank_zero=False), "f1_46[0]": money(b["net_profit"], blank_zero=False)}
+    if b.get("other_expenses"):
+        v.update({"f2_15[0]": b.get("other_description") or "Other business expenses",
+                  "f2_16[0]": money(b["other_expenses"]), "f2_33[0]": money(b["other_expenses"])})
+    radios = {"c1_1[0]": "1", "c1_2[0]": "Yes", **({"c1_7[0]": "1"} if b["net_profit"] < 0 else {})}
+    return fill_pdf(template_path(year, "f1040sc.pdf"), v, radios=radios)
+
+
+def schedule_8812(year, tp, fed):
+    L = fed["lines"]
+    S = L.get("s8812") or {}
+    name, ssn = _head(tp)
+    v = {"f1_1[0]": name, "f1_2[0]": ssn, "f1_3[0]": money(L["agi"], blank_zero=False),
+         "f1_8[0]": money(L["agi"], blank_zero=False), "f1_9[0]": str(S.get("kids", 0)),
+         "f1_10[0]": money(S.get("line5", 0)), "f1_11[0]": str(S["odc_count"]) if S.get("odc_count") else "",
+         "f1_12[0]": money(S.get("line7", 0)), "f1_13[0]": money(S.get("line8", 0)),
+         "f1_14[0]": money(S.get("line9", 0), blank_zero=False), "f1_15[0]": money(S.get("line10", 0)),
+         "f1_16[0]": money(S.get("line11", 0)), "f1_17[0]": money(S.get("line12", 0)),
+         "f1_18[0]": money(S.get("line13", 0)), "f1_19[0]": money(S.get("line14", 0))}
+    # line 12: "Is line 8 more than line 11?" [0] = No, [1] = Yes
+    radios = {"c1_1[1]": "2"} if S.get("line12") else {"c1_1[0]": "1"}
+    if S.get("line16a") and S.get("kids"):
+        v.update({"f2_2[0]": money(S["line16a"]), "f2_3[0]": str(S["kids"]), "f2_4[0]": money(S["line16b"]),
+                  "f2_5[0]": money(S["line17"]), "f2_6[0]": money(S["line18a"]),
+                  "f2_8[0]": money(S["line19"]), "f2_9[0]": money(S["line20"]), "f2_16[0]": money(S.get("line27", 0))})
+        radios["c2_1[1]" if S["line18a"] > 2500 else "c2_1[0]"] = "2" if S["line18a"] > 2500 else "1"
+        radios["c2_2[1]" if S["line16b"] >= 5100 else "c2_2[0]"] = "2" if S["line16b"] >= 5100 else "1"
+        if "line25" in S:
+            v.update({"f2_10[0]": money(S["line23"]), "f2_12[0]": money(S["line23"]), "f2_13[0]": money(S["line24"]),
+                      "f2_14[0]": money(S["line25"]), "f2_15[0]": money(S["line26"])})
+    return fill_pdf(template_path(year, "f1040s8.pdf"), v, radios=radios)

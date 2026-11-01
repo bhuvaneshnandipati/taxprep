@@ -190,6 +190,8 @@ def build_package(taxpayer: dict, profile: dict, result: dict, year: int = 2025)
         parts.append(doc); included.append(label)
 
     mode = fed.get("mode", "resident")
+    inc = result.get("_income") or {}
+    fed = dict(fed, _dependents_list=inc.get("dependents") or [])
     if mode == "nonresident":
         add(official.form_1040nr(year, taxpayer, fed), "Form 1040-NR")
     else:
@@ -210,11 +212,19 @@ def build_package(taxpayer: dict, profile: dict, result: dict, year: int = 2025)
         add(official.schedule_2(year, taxpayer, fed), "Schedule 2 (Form 1040)")
     if "Schedule 3" in sched or L.get("education_credit") or L.get("sch3_refundable"):
         add(official.schedule_3(year, taxpayer, fed), "Schedule 3 (Form 1040)")
+    if "Schedule 8812" in sched:
+        add(official.schedule_8812(year, taxpayer, fed), "Schedule 8812 (Form 1040)")
     if L.get("deduction_type") == "itemized" and L.get("deduction"):
         if mode == "nonresident":
             add(official.schedule_a_nr(year, taxpayer, fed), "Schedule A (Form 1040-NR)")
         else:
             add(official.schedule_a(year, taxpayer, fed), "Schedule A (Form 1040)")
+    if "Schedule B" in sched:
+        add(official.schedule_b(year, taxpayer, inc, fed), "Schedule B (Form 1040)")
+    if "Schedule C" in sched and inc.get("business"):
+        add(official.schedule_c(year, taxpayer, inc["business"]), "Schedule C (Form 1040)")
+    if "Schedule D" in sched:
+        add(official.schedule_d(year, taxpayer, inc, fed), "Schedule D (Form 1040)")
     if mode == "nonresident":
         if L.get("nec_tax"):
             add(official.schedule_nec(year, taxpayer, fed), "Schedule NEC (Form 1040-NR)")
@@ -238,7 +248,9 @@ def build_package(taxpayer: dict, profile: dict, result: dict, year: int = 2025)
     # schedules the engine says are needed but that are not generated here
     generated = {"Schedule 1", "Schedule 1-A", "Schedule 2", "Schedule 3", "Schedule A", "Schedule A (Form 1040-NR)",
                  "Schedule NEC (Form 1040-NR)", "Schedule OI (Form 1040-NR)", "Schedule SE", "Form 8959", "Form 8960",
-                 "Form 8833", "Form 1040-NR (dual-status statement)"}
+                 "Form 8833", "Form 1040-NR (dual-status statement)", "Schedule 8812", "Schedule B", "Schedule D"}
+    if inc.get("business"):
+        generated.add("Schedule C")
     for s_ in fed.get("schedules", []):
         if s_ not in generated:
             missing.append(s_)
