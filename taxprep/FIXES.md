@@ -125,7 +125,7 @@ The PDF is a clean filing package: no preview stamp, and a cover page with signi
 
 **Still not prepared:** listed on the cover page under "Also attach", or blocked:
 - **Form 8863 (education credits):** the credit is computed, but the form must be filled by hand.
-- **Form 8949:** sales without reported basis or with adjustments.
+- ~~Form 8949~~: now generated from the sales list (all six boxes per part, including 1099-DA crypto).
 - **Form 8283:** non-cash gifts over $500.
 - **AOTC for a student under 24:** blocked.
 - **California:** Schedule CA (540 / 540NR) is not generated. The rate schedule is used instead of the FTB tax table (±$1–2). CalEITC/YCTC and the health-coverage penalty are not computed.

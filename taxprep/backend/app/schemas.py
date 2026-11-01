@@ -85,6 +85,20 @@ class PayerIn(BaseModel):
     amount: Money = NonNeg
 
 
+class SaleIn(BaseModel):
+    """One Form 8949 row (sales that cannot go straight onto Schedule D line 1a/8a)."""
+    description: str = Field(default="", max_length=60)      # (a) e.g. "100 sh XYZ"
+    date_acquired: str = Field(default="", max_length=10)    # (b) MM/DD/YYYY or VARIOUS
+    date_sold: str = Field(default="", max_length=10)        # (c)
+    proceeds: Money = NonNeg                                  # (d)
+    basis: Money = NonNeg                                     # (e)
+    code: str = Field(default="", max_length=6)              # (f) adjustment code(s)
+    adjustment: Money = 0                                     # (g) + or -
+    term: Literal["short", "long"] = "short"
+    reporting: Literal["basis_reported", "basis_not_reported", "no_form"] = "basis_not_reported"
+    digital_asset: bool = False                               # reported on 1099-DA (boxes G-L)
+
+
 class BusinessIn(BaseModel):
     """Schedule C. Expenses by category (line numbers in comments)."""
     description: str = Field(default="", max_length=60)      # A: principal business or profession
@@ -163,6 +177,7 @@ class IncomeIn(BaseModel):
     st_loss_carryover: Money = NonNeg        # from last year's Capital Loss Carryover Worksheet
     lt_loss_carryover: Money = NonNeg
     business: Optional[BusinessIn] = None    # Schedule C
+    sales: list[SaleIn] = Field(default=[], max_length=200)   # Form 8949 rows
     # state
     state: str = Field(default="CA", max_length=2)
     ca_full_year_resident: bool = True       # (name kept for compatibility) full-year resident of `state`

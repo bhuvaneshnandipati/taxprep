@@ -670,8 +670,17 @@ def schedule_d(year, tp, inc, fed):
     name, ssn = _head(tp)
     st_h = inc.get("st_proceeds", 0) - inc.get("st_basis", 0) + inc.get("capital_gain_st", 0)
     lt_h = inc.get("lt_proceeds", 0) - inc.get("lt_basis", 0) + inc.get("capital_gain_lt", 0)
-    st_net = st_h - inc.get("st_loss_carryover", 0)
-    lt_net = lt_h - inc.get("lt_loss_carryover", 0)
+    box_lines = {}            # Schedule D row -> (d, e, g, h) totals from Form 8949
+    for box, rows in _sales_by_box(inc.get("sales") or []).items():
+        tot = [sum(r["proceeds"] for r in rows), sum(r["basis"] for r in rows), sum(r["adjustment"] for r in rows)]
+        tot.append(tot[0] - tot[1] + tot[2])
+        line = _SCHED_D_ROW[box]
+        prev = box_lines.get(line, [0, 0, 0, 0])
+        box_lines[line] = [a + b for a, b in zip(prev, tot)]
+    st_8949 = sum(v[3] for k, v in box_lines.items() if k in ("1b", "2", "3"))
+    lt_8949 = sum(v[3] for k, v in box_lines.items() if k in ("8b", "9", "10"))
+    st_net = st_h + st_8949 - inc.get("st_loss_carryover", 0)
+    lt_net = lt_h + lt_8949 - inc.get("lt_loss_carryover", 0)
     total = st_net + lt_net
     v = {"f1_1[0]": name, "f1_2[0]": ssn}
     if st_h or inc.get("st_proceeds"):
@@ -683,6 +692,9 @@ def schedule_d(year, tp, inc, fed):
                   "f1_26[0]": money(lt_h, blank_zero=False)})
     v.update({"f1_42[0]": money(inc.get("lt_loss_carryover", 0), parens=False), "f1_43[0]": money(lt_net),
               "f2_1[0]": money(total, blank_zero=False)})
+    for line, (d, e, g, h) in box_lines.items():
+        f = _SCHED_D_FIELDS[line]
+        v.update({f[0]: money(d), f[1]: money(e), f[2]: money(g), f[3]: money(h, blank_zero=False)})
     radios = {**_yes_no("c1_1", False)}
     if total > 0:
         both = lt_net > 0
@@ -738,3 +750,51 @@ def schedule_8812(year, tp, fed):
             v.update({"f2_10[0]": money(S["line23"]), "f2_12[0]": money(S["line23"]), "f2_13[0]": money(S["line24"]),
                       "f2_14[0]": money(S["line25"]), "f2_15[0]": money(S["line26"])})
     return fill_pdf(template_path(year, "f1040s8.pdf"), v, radios=radios)
+
+
+# ======================================================================= Form 8949
+# box letter per (term, reporting, digital asset); 8949 checkbox on-state 1-6 in this order per part
+_BOXES = {("short", False): "ABC", ("short", True): "GHI", ("long", False): "DEF", ("long", True): "JKL"}
+_REPORT_IDX = {"basis_reported": 0, "basis_not_reported": 1, "no_form": 2}
+_BOX_STATE = {b: str(i + 1) for i, b in enumerate("ABCGHI")} | {b: str(i + 1) for i, b in enumerate("DEFJKL")}
+_SCHED_D_ROW = {"A": "1b", "G": "1b", "B": "2", "H": "2", "C": "3", "I": "3",
+                "D": "8b", "J": "8b", "E": "9", "K": "9", "F": "10", "L": "10"}
+_SCHED_D_FIELDS = {"1b": ["f1_7[0]", "f1_8[0]", "f1_9[0]", "f1_10[0]"], "2": ["f1_11[0]", "f1_12[0]", "f1_13[0]", "f1_14[0]"],
+                   "3": ["f1_15[0]", "f1_16[0]", "f1_17[0]", "f1_18[0]"], "8b": ["f1_27[0]", "f1_28[0]", "f1_29[0]", "f1_30[0]"],
+                   "9": ["f1_31[0]", "f1_32[0]", "f1_33[0]", "f1_34[0]"], "10": ["f1_35[0]", "f1_36[0]", "f1_37[0]", "f1_38[0]"]}
+
+
+def _sales_by_box(sales):
+    out = {}
+    for x in sales:
+        box = _BOXES[(x["term"], bool(x.get("digital_asset")))][_REPORT_IDX[x["reporting"]]]
+        out.setdefault(box, []).append(x)
+    return out
+
+
+def form_8949(year, tp, sales):
+    """One page per box per 11 rows: Part I (short-term) is page 1, Part II (long-term) page 2."""
+    import pymupdf
+    name, ssn = _head(tp, ssn_dashed)
+    out = pymupdf.open()
+    for box, rows in sorted(_sales_by_box(sales).items(), key=lambda kv: ("ABCGHIDEFJKL".index(kv[0]))):
+        long = box in "DEFJKL"
+        pg = "f2" if long else "f1"
+        for start in range(0, len(rows), 11):
+            chunk = rows[start:start + 11]
+            v = {f"{pg}_01[0]": name, f"{pg}_02[0]": ssn}
+            for i, x in enumerate(chunk):
+                n = 3 + 8 * i
+                gain = x["proceeds"] - x["basis"] + x["adjustment"]
+                v.update({f"{pg}_{n:02d}[0]": x["description"], f"{pg}_{n + 1:02d}[0]": x["date_acquired"],
+                          f"{pg}_{n + 2:02d}[0]": x["date_sold"], f"{pg}_{n + 3:02d}[0]": money(x["proceeds"], blank_zero=False),
+                          f"{pg}_{n + 4:02d}[0]": money(x["basis"], blank_zero=False), f"{pg}_{n + 5:02d}[0]": x.get("code", ""),
+                          f"{pg}_{n + 6:02d}[0]": money(x["adjustment"]), f"{pg}_{n + 7:02d}[0]": money(gain, blank_zero=False)})
+            d = sum(x["proceeds"] for x in chunk); e = sum(x["basis"] for x in chunk); g = sum(x["adjustment"] for x in chunk)
+            v.update({f"{pg}_91[0]": money(d, blank_zero=False), f"{pg}_92[0]": money(e, blank_zero=False),
+                      f"{pg}_94[0]": money(g), f"{pg}_95[0]": money(d - e + g, blank_zero=False)})
+            cb = "c2_1" if long else "c1_1"
+            doc = fill_pdf(template_path(year, "f8949.pdf"), v, radios={f"{cb}[{int(_BOX_STATE[box]) - 1}]": _BOX_STATE[box]})
+            doc.select([1 if long else 0])
+            out.insert_pdf(doc)
+    return out

@@ -204,8 +204,11 @@ def run_calculation(r: TaxReturn) -> dict:
         inc["interest"] = sum(p_["amount"] for p_ in inc["interest_payers"])
     if inc["dividend_payers"]:
         inc["dividends"] = sum(p_["amount"] for p_ in inc["dividend_payers"])
-    st_gain = inc["capital_gain_st"] + inc["st_proceeds"] - inc["st_basis"] - inc["st_loss_carryover"]
-    lt_gain = inc["capital_gain_lt"] + inc["lt_proceeds"] - inc["lt_basis"] - inc["lt_loss_carryover"]
+    sale_gain = {"short": 0.0, "long": 0.0}
+    for x in inc["sales"]:
+        sale_gain[x["term"]] += x["proceeds"] - x["basis"] + x["adjustment"]
+    st_gain = inc["capital_gain_st"] + inc["st_proceeds"] - inc["st_basis"] - inc["st_loss_carryover"] + sale_gain["short"]
+    lt_gain = inc["capital_gain_lt"] + inc["lt_proceeds"] - inc["lt_basis"] - inc["lt_loss_carryover"] + sale_gain["long"]
     biz = inc["business"]
     se_income = inc["se_income"]
     if biz:
@@ -243,6 +246,8 @@ def run_calculation(r: TaxReturn) -> dict:
         days_present=p.get("days_current", 0), first_entry_year=p.get("first_entry_year", 0),
         estimated_payments=inc["estimated_payments"])
     fed = compute_federal(fin, res)
+    if inc["sales"] and "Schedule D" in fed.schedules:
+        fed.schedules.append("Form 8949")
     st = compute_state(StateInput(
         state=state, withholding=state_wh, full_year_resident=inc["ca_full_year_resident"],
         income_ratio=inc["ca_income_ratio"], state_source_income=inc["state_source_income"],

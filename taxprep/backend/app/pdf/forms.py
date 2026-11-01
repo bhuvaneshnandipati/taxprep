@@ -225,6 +225,8 @@ def build_package(taxpayer: dict, profile: dict, result: dict, year: int = 2025)
         add(official.schedule_c(year, taxpayer, inc["business"]), "Schedule C (Form 1040)")
     if "Schedule D" in sched:
         add(official.schedule_d(year, taxpayer, inc, fed), "Schedule D (Form 1040)")
+    if "Form 8949" in sched and inc.get("sales"):
+        add(official.form_8949(year, taxpayer, inc["sales"]), "Form 8949")
     if mode == "nonresident":
         if L.get("nec_tax"):
             add(official.schedule_nec(year, taxpayer, fed), "Schedule NEC (Form 1040-NR)")
@@ -248,7 +250,7 @@ def build_package(taxpayer: dict, profile: dict, result: dict, year: int = 2025)
     # schedules the engine says are needed but that are not generated here
     generated = {"Schedule 1", "Schedule 1-A", "Schedule 2", "Schedule 3", "Schedule A", "Schedule A (Form 1040-NR)",
                  "Schedule NEC (Form 1040-NR)", "Schedule OI (Form 1040-NR)", "Schedule SE", "Form 8959", "Form 8960",
-                 "Form 8833", "Form 1040-NR (dual-status statement)", "Schedule 8812", "Schedule B", "Schedule D"}
+                 "Form 8833", "Form 1040-NR (dual-status statement)", "Schedule 8812", "Schedule B", "Schedule D", "Form 8949"}
     if inc.get("business"):
         generated.add("Schedule C")
     for s_ in fed.get("schedules", []):

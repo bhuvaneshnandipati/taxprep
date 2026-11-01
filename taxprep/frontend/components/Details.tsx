@@ -103,7 +103,7 @@ export function BrokerTotals({ inc, setI }: { inc: any; setI: (p: any) => void }
   return (
     <div className="sm:col-span-2">
       <h3 className="font-bold mb-1">Stock and crypto sales (Form 1099-B)</h3>
-      <p className="text-xs text-mute mb-3">Enter your broker&apos;s totals for sales where cost basis was reported to the IRS and there are no adjustments (Box A short-term, Box D long-term). Other sales need Form 8949, which TaxPrep does not prepare yet.</p>
+      <p className="text-xs text-mute mb-3">Enter your broker&apos;s totals for sales where cost basis was reported to the IRS and there are no adjustments (Box A short-term, Box D long-term). Other sales go in the list below (Form 8949).</p>
       <div className="grid sm:grid-cols-2 gap-4">
         <Field label="Short-term proceeds"><MoneyInput value={inc.st_proceeds} onChange={(v) => setI({ st_proceeds: v })} /></Field>
         <Field label="Short-term cost basis"><MoneyInput value={inc.st_basis} onChange={(v) => setI({ st_basis: v })} /></Field>
@@ -146,6 +146,43 @@ export function BusinessEditor({ value, onChange }: { value: Business | null; on
         {value.other_expenses > 0 && <Field label="Describe other expenses"><TextInput value={value.other_description} onChange={(v) => set({ other_description: v })} placeholder="Software subscriptions" maxLength={60} /></Field>}
       </div>
       <p className="mt-4 font-mono text-sm">Net profit (line 31): <span className={profit >= 0 ? "text-refund" : "text-owe"}>${Math.round(profit).toLocaleString()}</span></p>
+    </div>
+  );
+}
+
+export type Sale = { description: string; date_acquired: string; date_sold: string; proceeds: number; basis: number;
+  code: string; adjustment: number; term: "short" | "long"; reporting: "basis_reported" | "basis_not_reported" | "no_form"; digital_asset: boolean };
+const emptySale = (): Sale => ({ description: "", date_acquired: "", date_sold: "", proceeds: 0, basis: 0, code: "", adjustment: 0,
+  term: "short", reporting: "basis_not_reported", digital_asset: false });
+
+export function SalesEditor({ value, onChange }: { value: Sale[]; onChange: (v: Sale[]) => void }) {
+  const set = (i: number, p: Partial<Sale>) => onChange(value.map((d, j) => (j === i ? { ...d, ...p } : d)));
+  return (
+    <div className="sm:col-span-2">
+      <h3 className="font-bold mb-1">Individual sales (Form 8949)</h3>
+      <p className="text-xs text-mute mb-3">Add each sale that the totals above can&apos;t cover: basis not reported to the IRS, no 1099-B, crypto (1099-DA), or an adjustment such as a wash sale (code W).</p>
+      {value.map((x, i) => (
+        <div key={i} className="card mb-3 grid sm:grid-cols-3 gap-3">
+          <Field label="Description" wide><TextInput value={x.description} onChange={(v) => set(i, { description: v })} placeholder="100 sh XYZ Co." maxLength={60} /></Field>
+          <Field label="Held"><select className="inp" value={x.term} onChange={(e) => set(i, { term: e.target.value as Sale["term"] })}>
+            <option value="short">1 year or less</option><option value="long">More than 1 year</option></select></Field>
+          <Field label="Date acquired"><TextInput value={x.date_acquired} onChange={(v) => set(i, { date_acquired: v })} placeholder="MM/DD/YYYY or VARIOUS" maxLength={10} /></Field>
+          <Field label="Date sold"><TextInput value={x.date_sold} onChange={(v) => set(i, { date_sold: v })} placeholder="MM/DD/YYYY" maxLength={10} /></Field>
+          <Field label="Reported to you on"><select className="inp" value={x.reporting} onChange={(e) => set(i, { reporting: e.target.value as Sale["reporting"] })}>
+            <option value="basis_reported">1099 with basis reported to IRS</option>
+            <option value="basis_not_reported">1099 without basis reported</option>
+            <option value="no_form">No 1099</option></select></Field>
+          <Field label="Proceeds"><MoneyInput value={x.proceeds} onChange={(v) => set(i, { proceeds: v })} /></Field>
+          <Field label="Cost basis"><MoneyInput value={x.basis} onChange={(v) => set(i, { basis: v })} /></Field>
+          <Field label="Adjustment code"><TextInput value={x.code} onChange={(v) => set(i, { code: v.toUpperCase() })} placeholder="W" maxLength={6} /></Field>
+          <Field label="Adjustment amount" hint="Positive adds to the gain (e.g. disallowed wash-sale loss)."><MoneyInput allowNegative value={x.adjustment} onChange={(v) => set(i, { adjustment: v })} /></Field>
+          <div className="sm:col-span-3 flex justify-between items-center">
+            <Check label="Digital asset (crypto, Form 1099-DA)" value={x.digital_asset} onChange={(v) => set(i, { digital_asset: v })} />
+            <button type="button" className="text-xs text-owe" onClick={() => onChange(value.filter((_, j) => j !== i))}>Remove sale</button>
+          </div>
+        </div>
+      ))}
+      <button type="button" className="btn-ghost" onClick={() => onChange([...value, emptySale()])}>+ Add sale</button>
     </div>
   );
 }

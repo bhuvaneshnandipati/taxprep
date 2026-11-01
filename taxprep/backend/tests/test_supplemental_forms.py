@@ -159,3 +159,27 @@ def test_dependent_ssn_masked_in_api_and_kept_on_save():
     db = SessionLocal()
     assert db.query(TaxReturn).get(rid).income["dependents"][0]["ssn"] == "111-22-3333"
     db.close()
+
+
+def test_form_8949_pages_and_schedule_d_rows():
+    sales = [{"description": f"{10 + i} sh XYZ", "date_acquired": "03/01/2025", "date_sold": "09/01/2025",
+              "proceeds": 1000, "basis": 900, "term": "short", "reporting": "basis_not_reported"} for i in range(12)]
+    sales.append({"description": "0.5 BTC", "date_acquired": "01/05/2022", "date_sold": "06/10/2025",
+                  "proceeds": 30000, "basis": 10000, "term": "long", "reporting": "no_form", "digital_asset": True})
+    sales.append({"description": "Wash sale", "date_acquired": "02/01/2025", "date_sold": "04/01/2025",
+                  "proceeds": 500, "basis": 800, "code": "W", "adjustment": 300, "term": "short",
+                  "reporting": "basis_reported"})
+    res, doc = _pkg({"citizen": True}, {"state": "TX", "w2s": [{"wages": 50000}], "sales": sales})
+    L = res["federal"]["lines"]
+    # short: 12 x 100 + (500 - 800 + 300 = 0) = 1,200; long: 20,000
+    assert L["capital_gain"] == 21200
+    assert "Form 8949" in _forms(res)
+    pages = [" ".join(p.get_text().split()) for p in list(doc)[1:] if "Form 8949 (2025)" in p.get_text()]
+    assert len(pages) == 4          # box B: 11 + 1 rows (2 pages), box A wash sale (1), box L crypto (1)
+    p10 = [i for i, p in enumerate(pages) if "10 sh XYZ" in p]; p21 = [i for i, p in enumerate(pages) if "21 sh XYZ" in p]
+    assert p10 and p21 and p10 != p21                     # 12th row continues on a second page
+    assert any("0.5 BTC" in p and "20,000" in p for p in pages)
+    assert any("Wash sale" in p and " W " in f" {p} " for p in pages)
+    sd = _form(doc, "SCHEDULE D")
+    assert "12,000" in sd and "10,800" in sd and "1,200" in sd      # line 2 (box B) totals
+    assert "30,000" in sd and "10,000" in sd                         # line 10 (box L)

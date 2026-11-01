@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiJson, downloadPackage, uploadDocument } from "@/lib/api";
-import { BrokerTotals, BusinessEditor, DependentsEditor, ForeignAccounts, PayersEditor,
-  type Business, type Dependent, type Payer } from "@/components/Details";
+import { BrokerTotals, BusinessEditor, DependentsEditor, ForeignAccounts, PayersEditor, SalesEditor,
+  type Business, type Dependent, type Payer, type Sale } from "@/components/Details";
 import Ledger, { CalcResult, Residency, GREEN, RED } from "@/components/Ledger";
 import { MoneyInput, YesNo, Field, TextInput } from "@/components/Fields";
 
@@ -48,7 +48,7 @@ const blankIncome = {
   dependents: [] as Dependent[], interest_payers: [] as Payer[], dividend_payers: [] as Payer[],
   foreign_accounts: false, fbar_required: false, foreign_account_countries: "", foreign_trust: false,
   st_proceeds: 0, st_basis: 0, lt_proceeds: 0, lt_basis: 0, st_loss_carryover: 0, lt_loss_carryover: 0,
-  business: null as Business | null,
+  business: null as Business | null, sales: [] as Sale[],
 };
 
 export default function ReturnWizard() {
@@ -460,9 +460,10 @@ export default function ReturnWizard() {
               value={inc.dividend_payers} onChange={(v) => setI({ dividend_payers: v })} />}
             {!isNRA && <Field label="Qualified dividends (1099-DIV 1b)"><MoneyInput value={inc.qualified_dividends} onChange={(v) => setI({ qualified_dividends: v })} /></Field>}
           </>)}
-        {(yes("has_capital_gains") || inc.capital_gain_lt !== 0 || inc.capital_gain_st !== 0) && (
+        {(yes("has_capital_gains") || inc.capital_gain_lt !== 0 || inc.capital_gain_st !== 0 || inc.sales.length > 0 || inc.st_proceeds > 0 || inc.lt_proceeds > 0) && (
           <>
             {!isNRA && <BrokerTotals inc={inc} setI={setI} />}
+            {!isNRA && <SalesEditor value={inc.sales} onChange={(v) => setI({ sales: v })} />}
             <Field label={isNRA ? "Net short-term gain or (loss)" : "Other net short-term gain or (loss)"} hint={isNRA ? "Held 1 year or less. Use a minus sign for a loss." : "Only gains not included in the 1099-B totals above."}><MoneyInput allowNegative value={inc.capital_gain_st} onChange={(v) => setI({ capital_gain_st: v })} /></Field>
             <Field label={isNRA ? "Net long-term gain or (loss)" : "Other net long-term gain or (loss)"}><MoneyInput allowNegative value={inc.capital_gain_lt} onChange={(v) => setI({ capital_gain_lt: v })} /></Field>
           </>)}
