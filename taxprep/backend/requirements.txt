@@ -4,7 +4,7 @@ sqlalchemy>=2.0
 pydantic[email]>=2.6
 pyyaml
 bcrypt
-python-jose[cryptography]
+cryptography>=46
 python-multipart
 reportlab
 psycopg[binary]>=3.2

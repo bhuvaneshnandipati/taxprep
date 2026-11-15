@@ -121,3 +121,9 @@ Public API calls are disabled by default, and Render endpoints are rejected. Aft
 - Sign-up no longer needs an email list. Anyone can register until `MAX_USERS` accounts exist (default 25; `0` closes sign-up), with at most 3 new accounts per network per day (`MAX_SIGNUPS_PER_IP_PER_DAY`). `REGISTRATION_EMAILS` remains as an optional restriction.
 - `GET /auth/signup-status` lets the sign-in page show "Sign-up is full".
 - Backend: 125 passed, 2 skipped. Frontend build passed.
+
+## November 15, 2026: dependency and client-IP fixes
+
+- Removed `python-jose` (unpatched advisory; the app no longer imports it). `cryptography>=46` is now listed directly because `DATA_KEY` encryption needs it. Dev lock: dropped python-jose, ecdsa, rsa, pyasn1, six; bumped certifi 2026.10.23, opentelemetry-api 1.45.2, dnspython 2.9.2. pip-audit: no known vulnerabilities in either file.
+- `client_ip()` no longer trusts the first `X-Forwarded-For` entry. The website's new `frontend/proxy.ts` sends the visitor's IP with a shared `PROXY_SECRET`; the API trusts that header only when the key matches, otherwise it uses the last forwarded hop. Before this, all website visitors reached the API from one address, so 3 sign-ups a day or 20 wrong passwords blocked everyone. Deploy note in `docs/SECURITY.md`.
+- Backend: 128 passed, 2 skipped. Frontend build passed; local check showed forged browser headers stripped and the real IP forwarded.
