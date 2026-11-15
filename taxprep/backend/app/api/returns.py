@@ -243,7 +243,7 @@ def run_calculation(r: TaxReturn) -> dict:
         student_loan_interest=inc["student_loan_interest"], itemized=inc["itemized"],
         state_income_tax_paid=all_state_tax, charitable=inc["charitable"],
         other_itemized=inc["other_itemized"], qualified_tips=inc["qualified_tips"],
-        qualified_overtime=inc["qualified_overtime"], has_ssn=inc["has_ssn"], age=inc["age"],
+        qualified_overtime=inc["qualified_overtime"], vehicle_loans=inc["vehicle_loans"], has_ssn=inc["has_ssn"], age=inc["age"],
         qualifying_children=inc["qualifying_children"], other_dependents=inc["other_dependents"],
         tuition_paid=inc["tuition_paid"], education_credit_type=inc["education_credit_type"],
         country=p.get("country", ""), is_student=p.get("is_student", False),

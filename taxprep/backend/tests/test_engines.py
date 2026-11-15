@@ -256,3 +256,44 @@ def test_interview_nra_hides_dependents_and_tuition():
 def test_progress():
     p = progress({"multi_employer": "no"})
     assert 0 < p["pct"] < 100
+
+
+# ---------- Schedule 1-A Part IV: car loan interest (lines 22-30) ----------
+VIN_A = "1HGCM82633A004352"   # made-up but well-formed (17 characters, no I/O/Q)
+VIN_B = "2T1BURHE5JC012345"
+
+def _car(**kw):
+    loans = kw.pop("loans")
+    return compute_federal(FederalInput(vehicle_loans=loans, **kw), RES)
+
+def test_car_loan_interest_under_cap():
+    f = _car(wages=60000, loans=[{"vin": VIN_A, "interest": 3200, "qualifies": True}])
+    L = f.lines
+    assert L["sched1a_car_loan"] == 3200 and L["sched1a_total"] == 3200
+    assert L["taxable_income"] == 60000 - 15750 - 3200
+    assert L["car_loan_vins"] == [{"vin": VIN_A, "interest": 3200}]
+
+def test_car_loan_interest_cap_and_phaseout_rounds_up():
+    # two vehicles 7,000 + 6,000 -> capped at 10,000 (per return, also for MFJ)
+    f = _car(filing_status="mfj", wages=150000, loans=[{"vin": VIN_A, "interest": 7000, "qualifies": True},
+                                                       {"vin": VIN_B, "interest": 6000, "qualifies": True}])
+    assert f.lines["sched1a_car_loan"] == 10000
+    # single, MAGI 110,500: excess 10,500 -> 11 (rounded up) x $200 = 2,200
+    f = _car(wages=110500, loans=[{"vin": VIN_A, "interest": 5000, "qualifies": True}])
+    assert f.lines["sched1a_car_loan"] == 5000 - 2200
+    # MAGI 150,000 single: excess 50,000 -> 10,000 reduction: nothing left
+    f = _car(wages=150000, loans=[{"vin": VIN_A, "interest": 5000, "qualifies": True}])
+    assert f.lines["sched1a_car_loan"] == 0
+
+def test_car_loan_used_vehicle_or_missing_vin_rejected():
+    f = _car(wages=60000, loans=[{"vin": VIN_A, "interest": 3000, "qualifies": False}])
+    assert f.lines["sched1a_car_loan"] == 0 and any("Used vehicles" in e for e in f.explanations)
+    f = _car(wages=60000, loans=[{"vin": "ABC123", "interest": 3000, "qualifies": True}])
+    assert f.lines["sched1a_car_loan"] == 0 and any("VIN" in e for e in f.explanations)
+    f = _car(wages=60000, loans=[{"vin": "1HGCM82633A00435O", "interest": 3000, "qualifies": True}])  # letter O
+    assert f.lines["sched1a_car_loan"] == 0
+
+def test_car_loan_allowed_married_filing_separately():
+    # unlike tips/overtime/seniors, Part IV has no joint-filing rule; MFS threshold is $100,000
+    f = _car(filing_status="mfs", wages=50000, loans=[{"vin": VIN_A, "interest": 2000, "qualifies": True}])
+    assert f.lines["sched1a_car_loan"] == 2000

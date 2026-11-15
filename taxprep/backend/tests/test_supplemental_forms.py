@@ -252,3 +252,14 @@ def test_it201_pdf_has_nyc_lines():
     res, doc = _pkg({"citizen": True}, inc)
     text = " ".join(" ".join(p.get_text().split()) for p in doc)
     assert "1891" in text and "4588" in text and "1700" in text   # NYC tax, total tax (2,697 + 1,891), NYC withheld
+
+
+def test_car_loan_interest_on_schedule_1a():
+    res, doc = _pkg({"citizen": True}, {"state": "TX", "w2s": [{"wages": 104200, "fed_withholding": 9000}],
+                                        "vehicle_loans": [{"vin": "1hgcm82633a004352", "interest": 4100, "qualifies": True}]})
+    L = res["federal"]["lines"]
+    # MAGI 104,200: excess 4,200 -> 5 x $200 = 1,000; deduction 4,100 - 1,000
+    assert L["sched1a_car_loan"] == 3100
+    s1a = _form(doc, "No Tax on Car Loan Interest")
+    assert "1HGCM82633A004352" in s1a.replace(" ", "")      # VIN box is a comb field
+    assert "104,200 100,000 4,200 5 1,000 3,100" in s1a        # lines 25-30

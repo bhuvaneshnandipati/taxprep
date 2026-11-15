@@ -83,6 +83,13 @@ class DependentIn(BaseModel):
     credit: Literal["ctc", "odc", "none"] = "ctc"   # ctc: under 17 with an SSN; odc: other dependent
 
 
+class VehicleLoanIn(BaseModel):
+    """Schedule 1-A Part IV: one loan on a new personal vehicle."""
+    vin: str = Field(default="", max_length=20)
+    interest: Money = NonNeg        # 2025 interest not deducted on Schedule C, E or F
+    qualifies: bool = False         # taxpayer confirms: new, US final assembly, loan after 2024, personal use, first lien
+
+
 class PayerIn(BaseModel):
     name: str = Field(default="", max_length=60)
     amount: Money = NonNeg
@@ -171,6 +178,7 @@ class IncomeIn(BaseModel):
     other_itemized: Money = NonNeg           # Schedule A line 16 (only items listed in the instructions)
     qualified_tips: Money = NonNeg
     qualified_overtime: Money = NonNeg
+    vehicle_loans: list[VehicleLoanIn] = Field(default=[], max_length=2)   # Schedule 1-A Part IV
     has_ssn: bool = True
     age: int = Field(default=0, ge=0, le=120)
     spouse_age: int = Field(default=0, ge=0, le=120)   # married filing jointly

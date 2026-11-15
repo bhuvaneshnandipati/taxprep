@@ -16,6 +16,12 @@ from .residency import ResidencyResult
 from .treaty import apply_treaty, fdap_dividend_rate
 
 
+def valid_vin(vin: str) -> str:
+    """Upper-cased 17-character VIN (letters I, O and Q never appear), or "" if malformed."""
+    v = "".join(str(vin or "").split()).upper()
+    return v if len(v) == 17 and v.isalnum() and not set(v) & set("IOQ") else ""
+
+
 # --------------------------------------------------------------------------------------------
 # tax computation helpers
 # --------------------------------------------------------------------------------------------
@@ -132,6 +138,8 @@ class FederalInput:
     foreign_trust: bool = False
     qualified_tips: float = 0.0           # Schedule 1-A
     qualified_overtime: float = 0.0       # Schedule 1-A (FLSA premium portion only)
+    # Schedule 1-A Part IV: [{"vin": str, "interest": float, "qualifies": bool}], column (iii) amounts
+    vehicle_loans: list = field(default_factory=list)
     has_ssn: bool = True
     age: int = 0                          # 0 = unknown
     # dependents & education
@@ -369,7 +377,39 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
             if senior_ded:
                 sched.append("Schedule 1-A")
                 ex.append(f"Schedule 1-A enhanced deduction for seniors: ${senior_ded:,.0f}.")
-    s1a_total = tips_ded + ot_ded + senior_ded
+    # ---------------- Schedule 1-A Part IV (car loan interest) ------------------------------
+    car_ded = car_raw = 0.0
+    car_vins: list = []
+    cl = s1a.get("car_loan")
+    if cl and inp.vehicle_loans:
+        for loan in inp.vehicle_loans:
+            amt = max(0.0, float(loan.get("interest") or 0.0))
+            vin = valid_vin(loan.get("vin", ""))
+            if not amt:
+                continue
+            if not loan.get("qualifies"):
+                ex.append(f"Car loan interest ${amt:,.0f} not deducted: it must be on a loan taken out after 2024 "
+                          "for a new vehicle with final assembly in the U.S. (under 14,000 lb), for personal use, "
+                          "secured by the vehicle. Used vehicles and leases do not qualify.")
+                continue
+            if not vin:
+                ex.append(f"Car loan interest ${amt:,.0f} not deducted: Schedule 1-A needs the vehicle's "
+                          "17-character VIN.")
+                continue
+            if len(car_vins) >= cl["max_vins"]:
+                ex.append("More than two vehicles: only the first two are on Schedule 1-A (see the IRS instructions).")
+                break
+            car_vins.append({"vin": vin, "interest": amt})
+            car_raw += amt
+        if car_raw:
+            capped = min(car_raw, cl["cap"])
+            # lines 27-29: excess MAGI / $1,000 rounded UP, times $200
+            car_red = math.ceil(max(0.0, agi - cl["phaseout_magi"][fs]) / 1000) * cl["phaseout_per_1000"]
+            car_ded = max(0.0, capped - car_red)
+            sched.append("Schedule 1-A")
+            ex.append(f"Schedule 1-A car loan interest: ${car_ded:,.0f} of ${car_raw:,.0f} deducted "
+                      f"(limit ${cl['cap']:,}; reduced above ${cl['phaseout_magi'][fs]:,} income).")
+    s1a_total = tips_ded + ot_ded + senior_ded + car_ded
 
     taxable = max(0.0, agi - deduction - s1a_total)
 
@@ -563,6 +603,7 @@ def compute_federal(inp: FederalInput, res: ResidencyResult) -> FederalResult:
         "e8863": {k: (r(v) if isinstance(v, float) and k != "ratio" else v) for k, v in e8863.items()},
         "s8812": {k: (r(v) if isinstance(v, float) else v) for k, v in s8812.items()},
         "sched1a_tips": r(tips_ded), "sched1a_overtime": r(ot_ded), "sched1a_total": r(s1a_total),
+        "sched1a_car_loan": r(car_ded), "car_loan_raw": r(car_raw), "car_loan_vins": car_vins,
         "total_deductions": r(deduction + s1a_total), "taxable_income": r(taxable), "tax": r(tax),
         "ctc_odc": r(ctc + odc), "education_credit": r(edu_nonref), "other_credits": r(edu_nonref),
         "total_credits": r(total_credits), "tax_after_credits": r(tax_after),
