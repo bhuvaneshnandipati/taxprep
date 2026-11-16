@@ -80,6 +80,17 @@ schedule_1a:
     phaseout_magi: { single: 75000, mfj: 150000, hoh: 75000, qss: 75000 }
     phaseout_rate: 0.06
     born_before: "1961-01-02"
+  # Part IV no tax on car loan interest (2025 Schedule 1-A lines 22-30; IRC 163(h)(4), OBBBA sec. 70203).
+  # Up to $10,000 per return of interest on a loan originated after Dec 31, 2024, used to buy a NEW
+  # car/minivan/van/SUV/pickup/motorcycle (GVWR under 14,000 lb, final assembly in the US) for personal
+  # use, secured by a first lien. VIN required. Reduced by $200 per $1,000 (or part) of MAGI over
+  # $100,000 ($200,000 MFJ). No SSN or joint-filing requirement on the form. Sources: 2025 Schedule 1-A;
+  # IRS FS-2026-04; IRS Pub 6126.
+  car_loan:
+    cap: 10000
+    phaseout_magi: { single: 100000, mfj: 200000, mfs: 100000, hoh: 100000, qss: 100000 }
+    phaseout_per_1000: 200
+    max_vins: 2
 
 # Social Security tax withheld above this (6.2% x $176,100 wage base) by two or more employers is
 # refundable on Schedule 3, line 11 (2025 Form 1040 instructions).

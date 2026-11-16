@@ -22,7 +22,7 @@
 | 14 | Federal | Credit for Other Dependents could exceed the tax. Education credits were applied after the CTC. | Correct ordering and limits. |
 | 15 | Federal | EITC for people with no children ignored the age 25-64 rule (most students are under 25). | Age checked. EIC table midpoint method. |
 | 16 | Federal | SE tax was charged on net earnings under $400. | $400 threshold. |
-| 17 | Federal | OBBBA items were missing. | SALT cap $40k (phase-down above $500k); Schedule 1-A tips and overtime deductions. |
+| 17 | Federal | OBBBA items were missing. | SALT cap $40k (phase-down above $500k); Schedule 1-A tips and overtime deductions; Part IV car loan interest (Nov 15, 2026). |
 | 18 | California | **CA ignored that it does not follow tax treaties.** Treaty-exempt wages and NRA-exempt interest/gains were left out of CA income. | CA AGI is rebuilt on a worldwide basis, with the add-back shown on line 16. |
 | 19 | California | 2025 brackets, dependent credit ($480 → $475), renter's-credit limits and exemption phase-out were all wrong. | Replaced with FTB's published 2025 amounts. |
 | 20 | California | 540NR used a simple income ratio, didn't prorate exemption credits, and the phase-out was a cliff. | Official 540NR method (tax on all income × CA rate, prorated credits); $6 per $2,500 phase-out. |

@@ -7,6 +7,7 @@ import { BrokerTotals, BusinessEditor, DependentsEditor, ForeignAccounts, Payers
 import Ledger, { CalcResult, Residency, GREEN, RED } from "@/components/Ledger";
 import { MoneyInput, YesNo, Field, TextInput } from "@/components/Fields";
 
+type VehicleLoan = { vin: string; interest: number; qualifies: boolean };
 type Q = { id: string; section: string; text: string; type: string; options?: string[]; help?: string };
 type W2 = { employer: string; ein: string; wages: number; fed_withholding: number; ss_wages: number; ss_tax: number;
   medicare_wages: number | null; medicare_tax: number; state: string; state_wages: number; state_withholding: number;
@@ -47,6 +48,7 @@ const blankIncome = {
   estimated_payments: 0, state: "CA", ca_full_year_resident: true, ca_income_ratio: 1,
   state_source_income: null as number | null, state_itemized: 0, ca_renter: false,
   spouse_age: 0, medical_expenses: 0, real_estate_tax: 0, mortgage_interest: 0, charitable_noncash: 0,
+  vehicle_loans: [] as VehicleLoan[],
   dependents: [] as Dependent[], interest_payers: [] as Payer[], dividend_payers: [] as Payer[],
   foreign_accounts: false, fbar_required: false, foreign_account_countries: "", foreign_trust: false,
   st_proceeds: 0, st_basis: 0, lt_proceeds: 0, lt_basis: 0, st_loss_carryover: 0, lt_loss_carryover: 0,
@@ -485,6 +487,25 @@ export default function ReturnWizard() {
           </>)}
         {(yes("has_interest") || yes("has_dividends") || yes("has_self_employment") || inc.withholding_1099 > 0) && (
           <Field label="Federal tax withheld on 1099s"><MoneyInput value={inc.withholding_1099} onChange={(v) => setI({ withholding_1099: v })} /></Field>)}
+        {(yes("has_car_loan") || inc.vehicle_loans.length > 0) && (() => {
+          const loans = inc.vehicle_loans.length ? inc.vehicle_loans : [{ vin: "", interest: 0, qualifies: false }];
+          const setLoan = (i: number, patch: Partial<VehicleLoan>) =>
+            setI({ vehicle_loans: loans.map((l, j) => (j === i ? { ...l, ...patch } : l)) });
+          return (<>
+            {loans.map((l, i) => (
+              <div key={i} className="contents">
+                <Field label={`Vehicle ${i + 1}: VIN (17 characters)`} hint="On the purchase contract, registration or the driver-side dashboard.">
+                  <TextInput value={l.vin} maxLength={17} onChange={(v) => setLoan(i, { vin: v.toUpperCase() })} /></Field>
+                <Field label={`Vehicle ${i + 1}: car loan interest paid in 2025`} hint="Personal-use part only (not deducted on Schedule C, E or F).">
+                  <MoneyInput value={l.interest} onChange={(v) => setLoan(i, { interest: v })} /></Field>
+                <Field label={`Vehicle ${i + 1}: does it qualify?`} hint="Yes only if: bought new (not used, not leased), final assembly in the U.S., loan taken out in 2025, for personal use, and the loan is secured by the vehicle.">
+                  <YesNo value={l.qualifies ? "yes" : "no"} onChange={(v) => setLoan(i, { qualifies: v === "yes" })} /></Field>
+              </div>))}
+            {loans.length < 2 && (
+              <button type="button" className="chip chip-off" onClick={() => setI({ vehicle_loans: [...loans, { vin: "", interest: 0, qualifies: false }] })}>
+                Add a second vehicle</button>)}
+          </>);
+        })()}
         {(yes("student_loan") || inc.student_loan_interest > 0) && (
           <Field label="Student loan interest (1098-E)"><MoneyInput value={inc.student_loan_interest} onChange={(v) => setI({ student_loan_interest: v })} /></Field>)}
         {isResident && (yes("tuition_paid") || inc.tuition_paid > 0) && (

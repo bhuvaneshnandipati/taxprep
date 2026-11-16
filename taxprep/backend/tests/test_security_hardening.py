@@ -250,3 +250,52 @@ def test_schedule_a_detail():
                                   'charitable_noncash': 500})
     assert L['sa_medical'] == 2500 and L['salt_deduction'] == 10000
     assert L['sa_total'] == 2500 + 10000 + 12000 + 1500 and L['deduction_type'] == 'itemized'
+
+
+# --- client_ip(): which address the throttles count -------------------------------------
+def _req(headers, peer="10.0.0.9"):
+    from starlette.requests import Request
+    scope = {"type": "http", "headers": [(k.lower().encode(), v.encode()) for k, v in headers.items()],
+             "client": (peer, 1234)}
+    return Request(scope)
+
+
+def test_client_ip_ignores_spoofed_first_forwarded_entry(monkeypatch):
+    from app.core import security
+    monkeypatch.setattr(security.settings, "PROXY_SECRET", "")
+    # a caller can type the first entries; the platform proxy writes the last one
+    assert security.client_ip(_req({"X-Forwarded-For": "1.2.3.4, 203.0.113.7"})) == "203.0.113.7"
+    assert security.client_ip(_req({"X-Forwarded-For": "not-an-ip"})) == "10.0.0.9"
+    assert security.client_ip(_req({})) == "10.0.0.9"
+
+
+def test_client_ip_header_needs_the_proxy_key(monkeypatch):
+    from app.core import security
+    monkeypatch.setattr(security.settings, "PROXY_SECRET", "s" * 40)
+    base = {"X-Forwarded-For": "76.76.21.21", "X-TaxPrep-Client-IP": "198.51.100.5"}
+    assert security.client_ip(_req(base)) == "76.76.21.21"                                  # no key
+    assert security.client_ip(_req({**base, "X-TaxPrep-Proxy-Key": "wrong"})) == "76.76.21.21"
+    assert security.client_ip(_req({**base, "X-TaxPrep-Proxy-Key": "s" * 40})) == "198.51.100.5"
+    bad = {**base, "X-TaxPrep-Client-IP": "x; drop", "X-TaxPrep-Proxy-Key": "s" * 40}
+    assert security.client_ip(_req(bad)) == "76.76.21.21"                                   # junk value
+
+
+def test_ip_lockout_of_one_visitor_does_not_block_another(monkeypatch):
+    """All website traffic reaches the API from the same proxy address; with the keyed
+    header, failed sign-ins from one visitor must not lock out a different visitor."""
+    from app.core import security
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "PROXY_SECRET", "k" * 40)
+    monkeypatch.setattr(settings, "MAX_FAILED_PER_IP", 3)
+    proxy = {"X-Forwarded-For": "76.76.21.99", "X-TaxPrep-Proxy-Key": "k" * 40}
+    c = _client()
+    c.post("/auth/register", json={"email": "victim@test.com", "password": "password123"},
+           headers={**proxy, "X-TaxPrep-Client-IP": "198.51.100.20"})
+    attacker = {**proxy, "X-TaxPrep-Client-IP": "198.51.100.66"}
+    for i in range(3):
+        c.post("/auth/login", data={"username": f"nobody{i}@test.com", "password": "wrong-pass"}, headers=attacker)
+    assert c.post("/auth/login", data={"username": "nobody9@test.com", "password": "wrong-pass"},
+                  headers=attacker).status_code == 429
+    ok = c.post("/auth/login", data={"username": "victim@test.com", "password": "password123"},
+                headers={**proxy, "X-TaxPrep-Client-IP": "198.51.100.20"})
+    assert ok.status_code == 200

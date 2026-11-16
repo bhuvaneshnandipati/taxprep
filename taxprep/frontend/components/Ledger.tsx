@@ -54,7 +54,7 @@ export default function Ledger({ result }: { result: CalcResult }) {
       {F.adjustments > 0 && <Row line="10" desc="Adjustments" val={-F.adjustments} />}
       <Row line="11" desc="Adjusted gross income" val={F.agi} strong />
       <Row line="12" desc={`${F.deduction_type === "standard" ? "Standard" : "Itemized"} deduction`} val={-F.deduction} />
-      {F.sched1a_total > 0 && <Row line={nr ? "13c" : "13b"} desc="Tips / overtime (Sch. 1-A)" val={-F.sched1a_total} />}
+      {F.sched1a_total > 0 && <Row line={nr ? "13c" : "13b"} desc="Tips, overtime, car loan, seniors (Sch. 1-A)" val={-F.sched1a_total} />}
       <Row line="15" desc="Taxable income" val={F.taxable_income} strong />
       <Row line="16" desc="Tax" val={F.tax} />
       {F.ctc_odc > 0 && <Row line="19" desc="Child tax credit / ODC" val={-F.ctc_odc} />}

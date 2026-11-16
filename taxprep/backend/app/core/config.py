@@ -23,6 +23,10 @@ class Settings:
     # Abuse guard: at most this many new accounts per IP address per 24 hours.
     MAX_SIGNUPS_PER_IP_PER_DAY = int(os.getenv("MAX_SIGNUPS_PER_IP_PER_DAY", "3"))
     # Optional: if set, only these comma-separated emails may register (the cap still applies).
+    # Shared secret between the website and the API (server-only env on both Vercel projects).
+    # The website's proxy sends the visitor's real IP with this key; without it the API uses
+    # the address its own platform saw. Empty = never trust a forwarded client-IP header.
+    PROXY_SECRET = os.getenv("PROXY_SECRET", "")
     REGISTRATION_EMAILS = [e.strip().lower() for e in os.getenv("REGISTRATION_EMAILS", "").split(",") if e.strip()]
     PRODUCTION = any(os.getenv(n, "").lower() not in ("", "0", "false") for n in ("PRODUCTION", "RENDER", "VERCEL"))
     DEFAULT_TAX_YEAR = 2025

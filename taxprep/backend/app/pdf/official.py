@@ -567,7 +567,7 @@ def schedule_se(year, tp, fed, ss_wage_base):
 
 
 def schedule_1a(year, tp, fed, fs):
-    """Schedule 1-A: tips (Part II), overtime (Part III) and seniors (Part V)."""
+    """Schedule 1-A: tips (Part II), overtime (Part III), car loan interest (Part IV) and seniors (Part V)."""
     import math
     L = fed["lines"]
     name, ssn = _head(tp)
@@ -589,6 +589,16 @@ def schedule_1a(year, tp, fed, fs):
     if L.get("sched1a_overtime"):
         part(L["overtime_raw"], 25000 if fs == "mfj" else 12500, L["sched1a_overtime"],
              ["f1_22[0]", "f1_24[0]", "f1_25[0]", "f1_26[0]", "f1_27[0]", "f1_28[0]", "f1_29[0]", "f1_30[0]", "f1_31[0]"])
+    if L.get("sched1a_car_loan") or L.get("car_loan_raw"):
+        clim = 200000 if fs == "mfj" else 100000
+        cover = max(0, magi - clim)
+        csteps = math.ceil(cover / 1000)
+        for (vin_f, iii_f), loan in zip((("f2_01[0]", "f2_03[0]"), ("f2_04[0]", "f2_06[0]")), L.get("car_loan_vins", [])):
+            v.update({vin_f: loan["vin"], iii_f: money(loan["interest"])})
+        v.update({"f2_07[0]": money(L["car_loan_raw"]), "f2_08[0]": money(min(L["car_loan_raw"], 10000)),
+                  "f2_09[0]": money(magi, blank_zero=False), "f2_10[0]": money(clim, blank_zero=False),
+                  "f2_11[0]": money(cover), "f2_12[0]": str(csteps) if cover else "",
+                  "f2_13[0]": money(csteps * 200), "f2_14[0]": money(L["sched1a_car_loan"])})
     if L.get("sched1a_senior"):
         base = 150000 if fs == "mfj" else 75000
         sover = max(0, magi - base)

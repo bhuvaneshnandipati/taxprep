@@ -16,6 +16,8 @@ questions:
       help: "F-1 students may only be self-employed during OPT/STEM OPT in their field. Unauthorized work can affect your status." }
   - { id: tuition_paid, section: education, text: "Did you pay tuition or receive Form 1098-T?", type: yesno,
       show_if: "answers.get('_residency') == 'resident' or answers.get('citizen') == 'yes' or answers.get('green_card') == 'yes'" }
+  - { id: has_car_loan, section: deductions, text: "Did you pay interest in 2025 on a loan for a NEW car, SUV, pickup or motorcycle bought for personal use?", type: yesno,
+      help: "New for 2025 (Schedule 1-A): the loan must be from 2025 and the vehicle's final assembly must be in the U.S. Used vehicles and leases do not qualify." }
   - { id: student_loan, section: deductions, text: "Did you pay interest on a U.S. student loan (1098-E)?", type: yesno }
   - { id: has_charity, section: deductions, text: "Did you donate to U.S. charities?", type: yesno }
   - { id: has_dependents, section: dependents, text: "Do you have dependents with an SSN who live in the U.S.?", type: yesno,

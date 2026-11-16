@@ -7,7 +7,7 @@ stored. A session ends on sign-out, after SESSION_IDLE_MINUTES without use, or
 SESSION_MAX_HOURS after sign-in.
 """
 from datetime import datetime, timedelta, timezone
-import base64, hashlib, secrets
+import base64, hashlib, hmac, ipaddress, secrets
 import bcrypt
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
@@ -85,9 +85,42 @@ def current_user_email(request: Request, db: Session = Depends(get_db)) -> str:
 
 
 # ---------------------------------------------------------------- sign-in throttling
+CLIENT_IP_HEADER = "x-taxprep-client-ip"
+PROXY_KEY_HEADER = "x-taxprep-proxy-key"
+
+
+def _valid_ip(value: str) -> str:
+    try:
+        return str(ipaddress.ip_address(value.strip()))
+    except ValueError:
+        return ""
+
+
 def client_ip(request: Request) -> str:
+    """The visitor's address for sign-up and sign-in throttling.
+
+    1. The website (Next.js on Vercel) forwards API calls through its own proxy, so the
+       API would otherwise see one Vercel address for every visitor. The website's proxy
+       sends the visitor's IP in X-TaxPrep-Client-IP together with the shared PROXY_SECRET;
+       that header is trusted only when the key matches.
+    2. Otherwise use the LAST X-Forwarded-For entry: it is the one written by the platform
+       proxy in front of the API (Vercel overwrites the header; Render appends to it), while
+       earlier entries can be typed by the caller.
+    3. Otherwise the socket peer address.
+    """
+    secret = settings.PROXY_SECRET
+    if secret:
+        key = request.headers.get(PROXY_KEY_HEADER, "")
+        if key and hmac.compare_digest(key.encode(), secret.encode()):
+            ip = _valid_ip(request.headers.get(CLIENT_IP_HEADER, ""))
+            if ip:
+                return ip
     fwd = request.headers.get("x-forwarded-for", "")
-    return (fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "")) or "?"
+    if fwd:
+        ip = _valid_ip(fwd.split(",")[-1])
+        if ip:
+            return ip
+    return (request.client.host if request.client else "") or "?"
 
 
 def check_throttle(db: Session, email: str, ip: str):
